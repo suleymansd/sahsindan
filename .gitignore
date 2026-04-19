@@ -45,6 +45,8 @@ services/api/.uvicorn.log
 .vscode/
 .idea/
 *.iml
+.claude/
+*.tsbuildinfo
 
 # Misc
 *.swp
