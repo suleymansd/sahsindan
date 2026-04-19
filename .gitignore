@@ -1,0 +1,51 @@
+# macOS
+.DS_Store
+
+# Env
+.env
+.env.*
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+.logs/
+
+# Node / Next
+node_modules/
+.next/
+out/
+coverage/
+
+# Flutter / Dart
+.dart_tool/
+.packages
+build/
+.flutter-plugins
+.flutter-plugins-dependencies
+
+# Python
+.venv/
+.venv*/
+venv/
+__pycache__/
+*.pyc
+*.sqlite3
+
+# Service runtime artifacts
+services/api/storage/
+services/api/.run/
+services/api/.seed.log
+services/api/.uvicorn.log
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Misc
+*.swp
+*.swo

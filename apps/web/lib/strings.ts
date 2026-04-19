@@ -1,0 +1,47 @@
+export const UI = {
+  appName: "şahsından.com",
+  errors: {
+    loginRequired: "Bu sayfayı görmek için giriş yapmalısınız.",
+    verificationRequired: "Hesabınız henüz doğrulanmadı. Lütfen doğrulama adımlarını tamamlayın.",
+    generic: "Bir hata oluştu. Lütfen tekrar deneyin.",
+  },
+  actions: {
+    login: "Giriş Yap",
+    register: "Üye Ol",
+    logout: "Çıkış",
+    search: "Ara",
+    filter: "Filtrele",
+    clear: "Temizle",
+    apply: "Uygula",
+    send: "Gönder",
+    save: "Kaydet",
+    view: "İncele",
+    addFavorite: "Favoriye Ekle",
+    removeFavorite: "Favoriden Çıkar",
+    createListing: "İlan Ver",
+  },
+  badges: {
+    verifiedOnly: "Sadece Doğrulanmış",
+  },
+  labels: {
+    city: "Şehir",
+    district: "İlçe",
+    price: "Fiyat",
+    mileage: "Kilometre",
+    year: "Yıl",
+    transmission: "Vites",
+    fuel: "Yakıt",
+  },
+  sections: {
+    featured: "Öne Çıkan İlanlar",
+    favorites: "Favorilerim",
+    recent: "Son Görüntülenenler",
+    categories: "Kategoriler",
+    trust: "Doğrulanmış Topluluk",
+  },
+  emptyStates: {
+    favorites: "Favori ilanların burada görünecek.",
+    recent: "Henüz görüntülediğin ilan yok.",
+    listings: "Filtrelere uygun ilan bulunamadı.",
+  },
+};
