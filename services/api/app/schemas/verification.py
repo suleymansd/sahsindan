@@ -8,8 +8,8 @@ class VerificationStatusOut(BaseModel):
 
 
 class VerificationSubmit(BaseModel):
-    phone_otp: str
-    selfie_passed: bool
+    phone_otp: str = ""
+    selfie_passed: bool = False
     profession_proof: str | None = None
     background_consent: bool
 

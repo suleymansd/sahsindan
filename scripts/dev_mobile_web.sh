@@ -37,11 +37,13 @@ fi
 echo "[dev_mobile_web] Starting Flutter web on $WEB_URL"
 echo "[dev_mobile_web] If Chrome doesn't auto-open, open: $WEB_URL"
 cd "$REPO_ROOT/apps/mobile"
+if [[ ! -f .env ]]; then
+  cp .env.example .env
+fi
 
 # Prefer Chrome if available; fallback to web-server.
 if flutter devices 2>/dev/null | rg -q "Chrome \\(web\\)"; then
-  exec flutter run -d chrome --web-port=3005 --web-hostname=127.0.0.1
+  flutter run -d chrome --web-port=3005 --web-hostname=127.0.0.1
 else
-  exec flutter run -d web-server --web-port=3005 --web-hostname=127.0.0.1
+  flutter run -d web-server --web-port=3005 --web-hostname=127.0.0.1
 fi
-

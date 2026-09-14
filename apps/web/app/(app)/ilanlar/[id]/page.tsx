@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import {
@@ -21,6 +22,7 @@ import {
 import { AppointmentModal } from "@/components/appointment-modal";
 import { ListingBadge, ResponseStats, TrustBadge } from "@/components/badges";
 import { ListingGallery } from "@/components/listing-gallery";
+import { TrustScore } from "@/components/trust-score";
 import { MessageDrawer } from "@/components/message-drawer";
 import { VehiclePartsStatus } from "@/components/vehicle-parts-status";
 import { Badge } from "@/components/ui/badge";
@@ -182,8 +184,9 @@ export default function ListingDetailPage() {
   }
 
   return (
-    <div className="container py-8 md:py-10">
-      <div className="grid gap-6 lg:grid-cols-[1.55fr_1fr] lg:gap-8">
+    <div className="container py-7 md:py-9">
+      <nav aria-label="İçerik yolu" className="mb-6 flex flex-wrap items-center gap-2 text-xs text-text-muted"><Link href="/app" className="hover:text-foreground">Keşfet</Link><span>/</span><Link href="/ilanlar" className="hover:text-foreground">Otomobil ilanları</Link><span>/</span><span>{data.car_details?.brand || "İlan detayı"}</span><span className="ml-auto">İlan no: {data.id}</span></nav>
+      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_360px] lg:gap-8">
         <div className="space-y-6">
           <ListingGallery photos={data.photos} title={data.title} />
 
@@ -282,8 +285,9 @@ export default function ListingDetailPage() {
         </div>
 
         <div className="space-y-5">
-          <div className="sticky top-24 space-y-4">
+          <div className="sticky top-36 space-y-4">
             <div className="rounded-card border border-border bg-surface p-6 shadow-card">
+              <div className="mb-6 border-b border-border pb-5"><div className="text-xs text-text-muted">İlan fiyatı</div><div className="mt-2 font-display text-3xl font-semibold tracking-tight">{Number(data.price).toLocaleString("tr-TR")} <span className="text-base font-normal">TL</span></div><div className="mt-2 flex items-center gap-1.5 text-xs text-text-muted"><MapPin className="h-3 w-3" />{data.district}, {data.city === "ISTANBUL" ? "İstanbul" : data.city}</div></div>
               <div className="flex items-start gap-3">
                 <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-primary-light text-primary">
                   <UserRound className="h-5 w-5" />
@@ -302,6 +306,7 @@ export default function ListingDetailPage() {
                 </div>
               </div>
 
+              <div className="mt-5"><TrustScore score={data.owner.trust_score} /></div>
               <div className="mt-4 border-t border-border pt-4">
                 <ResponseStats
                   responseTime={data.owner.response_time_bucket}

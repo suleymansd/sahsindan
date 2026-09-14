@@ -13,7 +13,7 @@ void main() {
             useMaterial3: true,
             splashFactory: NoSplash.splashFactory,
           ),
-          home: LoginScreen(),
+          home: const LoginScreen(),
         ),
       ),
     );

@@ -27,8 +27,8 @@ class FavoritesController extends StateNotifier<FavoritesState> {
   Future<void> refresh() async {
     state = state.copyWith(loading: true);
     try {
-      final items = await _ref.read(listingsRepositoryProvider).favorites();
-      state = FavoritesState(ids: items.map((e) => e.id).toSet(), loading: false);
+      final ids = await _ref.read(listingsRepositoryProvider).favoriteIds();
+      state = FavoritesState(ids: ids.toSet(), loading: false);
     } finally {
       state = state.copyWith(loading: false);
     }

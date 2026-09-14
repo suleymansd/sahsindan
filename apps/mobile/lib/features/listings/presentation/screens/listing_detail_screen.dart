@@ -12,7 +12,9 @@ import '../../../../shared/widgets/app_chrome.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_loading.dart';
 import '../../../../shared/widgets/app_section.dart';
-import '../../../../shared/widgets/app_cell.dart';
+import '../../../../shared/widgets/listing_spec.dart';
+import '../../../../shared/widgets/listing_photo.dart';
+import '../../../../shared/models/listing.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../appointments/presentation/providers/appointments_providers.dart';
 import '../../../messaging/presentation/providers/messaging_providers.dart';
@@ -49,7 +51,9 @@ class ListingDetailScreen extends ConsumerWidget {
               )) {
                 return;
               }
-              final t = await ref.read(messagingRepositoryProvider).createThread(listingId: listing.id);
+              final t = await ref
+                  .read(messagingRepositoryProvider)
+                  .createThread(listingId: listing.id);
               ref.invalidate(threadsProvider);
               if (context.mounted) context.go('/app/threads/${t.id}');
             }
@@ -58,7 +62,8 @@ class ListingDetailScreen extends ConsumerWidget {
               if (!VerificationGate.ensureVerified(
                 context: context,
                 ref: ref,
-                message: 'Randevu olusturmak icin hesabini dogrulaman gerekiyor.',
+                message:
+                    'Randevu olusturmak icin hesabini dogrulaman gerekiyor.',
               )) {
                 return;
               }
@@ -76,7 +81,8 @@ class ListingDetailScreen extends ConsumerWidget {
                   );
               ref.invalidate(appointmentsProvider);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Randevu olusturuldu')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Randevu olusturuldu')));
                 context.go('/app/appointments');
               }
             }
@@ -100,7 +106,8 @@ class ListingDetailScreen extends ConsumerWidget {
                     category: payload.category,
                   );
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Rapor gonderildi')));
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Rapor gonderildi')));
               }
             }
 
@@ -125,112 +132,124 @@ class ListingDetailScreen extends ConsumerWidget {
               children: [
                 CustomScrollView(
                   slivers: [
-                    CupertinoSliverNavigationBar(
-                      largeTitle: const Text('Ilan'),
-                      border: const Border(bottom: BorderSide(color: AppColors.separator)),
-                      backgroundColor: AppColors.surface,
-                      trailing: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: fav.loading
-                                ? null
-                                : () async {
-                                    if (!VerificationGate.ensureVerified(
-                                      context: context,
-                                      ref: ref,
-                                      message: 'Favoriye eklemek icin hesabini dogrulaman gerekiyor.',
-                                    )) {
-                                      return;
-                                    }
-                                    try {
-                                      await favCtrl.toggle(id);
-                                    } catch (e) {
-                                      if (context.mounted) {
-                                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyErrorText(e))));
-                                      }
-                                    }
-                                  },
-                            child: Icon(
-                              fav.ids.contains(id) ? CupertinoIcons.heart_fill : CupertinoIcons.heart,
-                              size: 22,
-                              color: fav.ids.contains(id) ? AppColors.primary : AppColors.textSecondary,
-                            ),
+                    SliverAppBar(
+                        pinned: true,
+                        title: const Text('İlan Detayı'),
+                        leading: IconButton(
+                            tooltip: 'Geri',
+                            icon: const Icon(Icons.arrow_back_rounded),
+                            onPressed: () => context.canPop()
+                                ? context.pop()
+                                : context.go('/app/listings')),
+                        backgroundColor: AppColors.surface,
+                        actions: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: fav.loading
+                                    ? null
+                                    : () async {
+                                        if (!VerificationGate.ensureVerified(
+                                          context: context,
+                                          ref: ref,
+                                          message:
+                                              'Favoriye eklemek icin hesabini dogrulaman gerekiyor.',
+                                        )) {
+                                          return;
+                                        }
+                                        try {
+                                          await favCtrl.toggle(id);
+                                        } catch (e) {
+                                          if (context.mounted) {
+                                            ScaffoldMessenger.of(context)
+                                                .showSnackBar(SnackBar(
+                                                    content: Text(
+                                                        friendlyErrorText(e))));
+                                          }
+                                        }
+                                      },
+                                child: Icon(
+                                  fav.ids.contains(id)
+                                      ? CupertinoIcons.heart_fill
+                                      : CupertinoIcons.heart,
+                                  size: 22,
+                                  color: fav.ids.contains(id)
+                                      ? AppColors.primary
+                                      : AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                              CupertinoButton(
+                                padding: EdgeInsets.zero,
+                                onPressed: () =>
+                                    ref.invalidate(listingDetailProvider(id)),
+                                child: const Icon(CupertinoIcons.refresh,
+                                    size: 22, color: AppColors.primary),
+                              ),
+                            ],
                           ),
-                          const SizedBox(width: 6),
-                          CupertinoButton(
-                            padding: EdgeInsets.zero,
-                            onPressed: () => ref.invalidate(listingDetailProvider(id)),
-                            child: const Icon(CupertinoIcons.refresh, size: 22, color: AppColors.primary),
-                          ),
-                        ],
-                      ),
-                    ),
+                        ]),
+                    SliverToBoxAdapter(
+                        child: _PhotoCarousel(
+                            photos: photoUrls,
+                            publicBaseUrl: cfg.publicBaseUrl)),
                     SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 120),
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
                       sliver: SliverList(
                         delegate: SliverChildListDelegate(
                           [
-                            if (!auth.isVerified) _InlineVerifyBanner(onTap: () => context.push('/verification/status?message=Ilan%20detayini%20goruyorsun.%20Islem%20yapmak%20icin%20dogrulama%20gerekli.')),
-                            _PhotoCarousel(photos: photoUrls, publicBaseUrl: cfg.publicBaseUrl),
+                            if (!auth.isVerified)
+                              _InlineVerifyBanner(
+                                  onTap: () => context.push(
+                                      '/verification/status?message=Ilan%20detayini%20goruyorsun.%20Islem%20yapmak%20icin%20dogrulama%20gerekli.')),
                             const SizedBox(height: 12),
                             Text(
                               listing.title,
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w800, color: AppColors.textPrimary),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .headlineSmall
+                                  ?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.textPrimary),
                             ),
-                            const SizedBox(height: 6),
-                            Text(
-                              '₺${listing.price.toStringAsFixed(0)}',
-                              style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900, color: AppColors.textPrimary),
-                            ),
-                            const SizedBox(height: 10),
-                            Wrap(
-                              spacing: 8,
-                              runSpacing: 8,
-                              children: [
-                                _Pill(text: '${listing.city} • ${listing.district}', icon: CupertinoIcons.location),
-                                _Pill(text: '${listing.carDetails.brand} ${listing.carDetails.model}', icon: CupertinoIcons.car_detailed),
-                                _Pill(text: '${listing.carDetails.year}', icon: CupertinoIcons.calendar),
-                                _Pill(text: '${listing.carDetails.mileage} km', icon: CupertinoIcons.speedometer),
-                                _Pill(text: listing.state, icon: CupertinoIcons.circle_fill),
-                                if (listing.staleState != null) _Pill(text: 'Stale: ${listing.staleState}', icon: CupertinoIcons.exclamationmark_triangle),
-                              ],
-                            ),
+                            const SizedBox(height: 8),
+                            Row(children: [
+                              const Icon(Icons.location_on_outlined,
+                                  size: 16, color: AppColors.textSecondary),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                  child: Text(
+                                      '${listing.district}, ${listing.city == 'ISTANBUL' ? 'İstanbul' : listing.city}',
+                                      style: const TextStyle(
+                                          color: AppColors.textSecondary,
+                                          fontSize: 14))),
+                            ]),
                             const SizedBox(height: 16),
+                            Text('${listingNumber(listing.price)} TL',
+                                style: const TextStyle(
+                                    fontSize: 38,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: -1.2,
+                                    color: AppColors.primary)),
+                            const SizedBox(height: 24),
+                            _ListingSummary(listing: listing),
+                            const SizedBox(height: 24),
+                            _SellerCard(listing: listing),
+                            const SizedBox(height: 24),
                             AppSection(
-                              header: 'Satici',
-                              children: [
-                                AppCell(
-                                  icon: CupertinoIcons.person_crop_circle,
-                                  title: listing.owner.name,
-                                  subtitle: 'Trust score: ${listing.owner.trustScore}',
-                                  trailing: const SizedBox.shrink(),
-                                ),
-                                if (listing.owner.responseTimeBucket != null)
-                                  AppCell(
-                                    icon: CupertinoIcons.timer,
-                                    title: 'Yanıt hizı',
-                                    subtitle: listing.owner.responseTimeBucket!,
-                                    trailing: const SizedBox.shrink(),
-                                  ),
-                                AppCell(
-                                  icon: CupertinoIcons.clock,
-                                  title: 'Son aktif',
-                                  subtitle: listing.owner.lastActiveBucket,
-                                  trailing: const SizedBox.shrink(),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            AppSection(
-                              header: 'Aciklama',
+                              header: 'Açıklama',
                               children: [
                                 Padding(
                                   padding: const EdgeInsets.all(14),
                                   child: Text(
                                     listing.description,
-                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: AppColors.textPrimary),
+                                    style: Theme.of(context)
+                                        .textTheme
+                                        .bodyLarge
+                                        ?.copyWith(
+                                            color: AppColors.textPrimary),
                                   ),
                                 ),
                               ],
@@ -249,23 +268,33 @@ class ListingDetailScreen extends ConsumerWidget {
                                         _OutlinePillButton(
                                           label: 'Duzenle',
                                           icon: CupertinoIcons.pencil,
-                                          onPressed: () => context.go('/app/listings/${listing.id}/edit'),
+                                          onPressed: () => context.go(
+                                              '/app/listings/${listing.id}/edit'),
                                         ),
                                         _PrimaryPillButton(
                                           label: 'Yayinla',
-                                          icon: CupertinoIcons.arrow_up_circle_fill,
-                                          onPressed: listing.state == 'DRAFT' ? () => ownerAction('publish') : null,
+                                          icon: CupertinoIcons
+                                              .arrow_up_circle_fill,
+                                          onPressed: listing.state == 'DRAFT'
+                                              ? () => ownerAction('publish')
+                                              : null,
                                         ),
                                         _OutlinePillButton(
                                           label: 'Satildi',
                                           icon: CupertinoIcons.checkmark_seal,
-                                          onPressed: listing.state == 'PUBLISHED' ? () => ownerAction('sold') : null,
+                                          onPressed:
+                                              listing.state == 'PUBLISHED'
+                                                  ? () => ownerAction('sold')
+                                                  : null,
                                         ),
-                                        if (listing.staleState == 'NEEDS_CONFIRMATION')
+                                        if (listing.staleState ==
+                                            'NEEDS_CONFIRMATION')
                                           _PrimaryPillButton(
                                             label: 'Aktifligi onayla',
-                                            icon: CupertinoIcons.checkmark_circle_fill,
-                                            onPressed: () => ownerAction('confirm'),
+                                            icon: CupertinoIcons
+                                                .checkmark_circle_fill,
+                                            onPressed: () =>
+                                                ownerAction('confirm'),
                                           ),
                                       ],
                                     ),
@@ -287,21 +316,30 @@ class ListingDetailScreen extends ConsumerWidget {
                       try {
                         await createThread();
                       } catch (e) {
-                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyErrorText(e))));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(friendlyErrorText(e))));
+                        }
                       }
                     },
                     onAppointment: () async {
                       try {
                         await createAppointment();
                       } catch (e) {
-                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyErrorText(e))));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(friendlyErrorText(e))));
+                        }
                       }
                     },
                     onReport: () async {
                       try {
                         await report();
                       } catch (e) {
-                        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(friendlyErrorText(e))));
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text(friendlyErrorText(e))));
+                        }
                       }
                     },
                   ),
@@ -319,6 +357,105 @@ class ListingDetailScreen extends ConsumerWidget {
       ),
     );
   }
+}
+
+class _ListingSummary extends StatelessWidget {
+  const _ListingSummary({required this.listing});
+  final Listing listing;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+            color: const Color(0xFFECFAFE),
+            border:
+                Border.all(color: AppColors.secondary.withValues(alpha: .35)),
+            borderRadius: BorderRadius.circular(12)),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.auto_awesome_outlined, color: Color(0xFF0086A8)),
+            const SizedBox(width: 10),
+            Text('İlan Özeti', style: Theme.of(context).textTheme.titleLarge)
+          ]),
+          const SizedBox(height: 12),
+          Text(
+              '${listing.carDetails.year} model ${listing.carDetails.brand} ${listing.carDetails.model}. Araç özelliklerini ve satıcı bilgilerini aşağıda inceleyebilirsiniz.',
+              style: const TextStyle(
+                  fontSize: 14, height: 1.6, color: AppColors.primary)),
+          const SizedBox(height: 16),
+          Row(children: [
+            Expanded(
+                child: ListingSpec(
+                    label: 'Model yılı', value: '${listing.carDetails.year}')),
+            const SizedBox(width: 10),
+            Expanded(
+                child: ListingSpec(
+                    label: 'Kilometre',
+                    value: '${listingNumber(listing.carDetails.mileage)} km'))
+          ]),
+          const SizedBox(height: 10),
+          Row(children: [
+            Expanded(
+                child: ListingSpec(
+                    label: 'Yakıt', value: carLabel(listing.carDetails.fuel))),
+            const SizedBox(width: 10),
+            Expanded(
+                child: ListingSpec(
+                    label: 'Şanzıman',
+                    value: carLabel(listing.carDetails.transmission)))
+          ]),
+        ]),
+      );
+}
+
+class _SellerCard extends StatelessWidget {
+  const _SellerCard({required this.listing});
+  final Listing listing;
+
+  @override
+  Widget build(BuildContext context) => AppGlass(
+        radius: 12,
+        padding: const EdgeInsets.all(18),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Satıcı Profili', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 20),
+          Row(children: [
+            SizedBox(
+                width: 76,
+                height: 76,
+                child: Stack(alignment: Alignment.center, children: [
+                  SizedBox.expand(
+                      child: CircularProgressIndicator(
+                          value: listing.owner.trustScore.clamp(0, 100) / 100,
+                          strokeWidth: 5,
+                          backgroundColor: AppColors.surfaceMuted,
+                          color: AppColors.success)),
+                  Column(mainAxisSize: MainAxisSize.min, children: [
+                    Text('${listing.owner.trustScore}',
+                        style: const TextStyle(
+                            fontSize: 27,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.success)),
+                    const Text('/ 100',
+                        style: TextStyle(
+                            fontSize: 10, color: AppColors.textSecondary))
+                  ]),
+                ])),
+            const SizedBox(width: 20),
+            Expanded(
+                child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                  Text(listing.owner.name,
+                      style: Theme.of(context).textTheme.titleLarge),
+                  const SizedBox(height: 6),
+                  const Text('Satıcı güven skoru',
+                      style: TextStyle(
+                          color: AppColors.textSecondary, fontSize: 13))
+                ])),
+          ]),
+        ]),
+      );
 }
 
 class _InlineVerifyBanner extends StatelessWidget {
@@ -343,7 +480,8 @@ class _InlineVerifyBanner extends StatelessWidget {
           ),
           child: Row(
             children: [
-              const Icon(CupertinoIcons.checkmark_shield, color: AppColors.primary, size: 20),
+              const Icon(CupertinoIcons.checkmark_shield,
+                  color: AppColors.primary, size: 20),
               const SizedBox(width: 10),
               Expanded(
                 child: Column(
@@ -351,47 +489,26 @@ class _InlineVerifyBanner extends StatelessWidget {
                   children: [
                     Text(
                       'Islem yapabilmek icin dogrulama gerekli',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w700, color: AppColors.textPrimary),
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary),
                     ),
                     const SizedBox(height: 2),
                     Text(
                       'Mesaj, randevu ve rapor icin hesabini dogrula.',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: AppColors.textSecondary),
+                      style: Theme.of(context)
+                          .textTheme
+                          .bodyMedium
+                          ?.copyWith(color: AppColors.textSecondary),
                     ),
                   ],
                 ),
               ),
-              const Icon(CupertinoIcons.chevron_forward, color: AppColors.primary, size: 18),
+              const Icon(CupertinoIcons.chevron_forward,
+                  color: AppColors.primary, size: 18),
             ],
           ),
         ),
-      ),
-    );
-  }
-}
-
-class _Pill extends StatelessWidget {
-  const _Pill({required this.text, required this.icon});
-
-  final String text;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: AppColors.separator),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 14, color: AppColors.textSecondary),
-          const SizedBox(width: 6),
-          Text(text, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: AppColors.textPrimary)),
-        ],
       ),
     );
   }
@@ -421,15 +538,20 @@ class _BottomActions extends StatelessWidget {
         child: Row(
           children: [
             Expanded(
-              child: CupertinoButton.filled(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              child: CupertinoButton(
+                color: AppColors.success,
+                borderRadius: BorderRadius.circular(8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                 onPressed: onMessage,
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(CupertinoIcons.chat_bubble_2_fill, size: 18),
+                    Icon(CupertinoIcons.chat_bubble_2_fill,
+                        size: 18, color: Colors.white),
                     SizedBox(width: 8),
-                    Text('Mesaj'),
+                    Text('Mesaj Gönder',
+                        style: TextStyle(fontSize: 14, color: Colors.white)),
                   ],
                 ),
               ),
@@ -452,7 +574,8 @@ class _BottomActions extends StatelessWidget {
 }
 
 class _OutlineButton extends StatelessWidget {
-  const _OutlineButton({required this.onPressed, required this.icon, required this.label});
+  const _OutlineButton(
+      {required this.onPressed, required this.icon, required this.label});
 
   final VoidCallback? onPressed;
   final IconData icon;
@@ -470,11 +593,15 @@ class _OutlineButton extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, size: 18, color: disabled ? AppColors.textSecondary : AppColors.primary),
+          Icon(icon,
+              size: 18,
+              color: disabled ? AppColors.textSecondary : AppColors.primary),
           const SizedBox(width: 8),
           Text(
             label,
-            style: TextStyle(color: disabled ? AppColors.textSecondary : AppColors.primary, fontWeight: FontWeight.w700),
+            style: TextStyle(
+                color: disabled ? AppColors.textSecondary : AppColors.primary,
+                fontWeight: FontWeight.w700),
           ),
         ],
       ),
@@ -499,7 +626,8 @@ class _IconOnlyButton extends StatelessWidget {
 }
 
 class _PrimaryPillButton extends StatelessWidget {
-  const _PrimaryPillButton({required this.label, required this.icon, required this.onPressed});
+  const _PrimaryPillButton(
+      {required this.label, required this.icon, required this.onPressed});
 
   final String label;
   final IconData icon;
@@ -523,7 +651,8 @@ class _PrimaryPillButton extends StatelessWidget {
 }
 
 class _OutlinePillButton extends StatelessWidget {
-  const _OutlinePillButton({required this.label, required this.icon, required this.onPressed});
+  const _OutlinePillButton(
+      {required this.label, required this.icon, required this.onPressed});
 
   final String label;
   final IconData icon;
@@ -548,11 +677,17 @@ class _OutlinePillButton extends StatelessWidget {
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(icon, size: 16, color: disabled ? AppColors.textSecondary : AppColors.primary),
+              Icon(icon,
+                  size: 16,
+                  color:
+                      disabled ? AppColors.textSecondary : AppColors.primary),
               const SizedBox(width: 8),
               Text(
                 label,
-                style: TextStyle(color: disabled ? AppColors.textSecondary : AppColors.primary, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                    color:
+                        disabled ? AppColors.textSecondary : AppColors.primary,
+                    fontWeight: FontWeight.w700),
               ),
             ],
           ),
@@ -580,23 +715,20 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
     final items = widget.photos;
 
     return ClipRRect(
-      borderRadius: BorderRadius.circular(16),
+      borderRadius: BorderRadius.zero,
       child: Stack(
         children: [
           AspectRatio(
-            aspectRatio: 4 / 3,
+            aspectRatio: 16 / 11,
             child: items.isEmpty
-                ? Container(
-                    color: AppColors.background,
-                    child: const Center(child: Icon(CupertinoIcons.photo, size: 48, color: AppColors.textSecondary)),
-                  )
+                ? const ListingPhotoView()
                 : PageView.builder(
                     itemCount: items.length,
                     onPageChanged: (i) => setState(() => _active = i),
-                    itemBuilder: (context, i) {
-                      final url = resolvePublicUrl(publicBaseUrl: widget.publicBaseUrl, maybeRelative: items[i]);
-                      return Image.network(url, fit: BoxFit.cover);
-                    },
+                    itemBuilder: (context, i) => ListingPhotoView(
+                        url: resolvePublicUrl(
+                            publicBaseUrl: widget.publicBaseUrl,
+                            maybeRelative: items[i])),
                   ),
           ),
           Positioned(
@@ -609,7 +741,9 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
                 borderRadius: BorderRadius.circular(999),
               ),
               child: Text(
-                items.isEmpty ? '0 / 0' : '${_active + 1} / ${items.length}',
+                items.isEmpty
+                    ? 'Fotoğraf yok'
+                    : '${_active + 1} / ${items.length}',
                 style: const TextStyle(color: Colors.white),
               ),
             ),
@@ -621,7 +755,8 @@ class _PhotoCarouselState extends State<_PhotoCarousel> {
 }
 
 class _AppointmentDraft {
-  const _AppointmentDraft({required this.scheduledAt, required this.location, required this.notes});
+  const _AppointmentDraft(
+      {required this.scheduledAt, required this.location, required this.notes});
 
   final DateTime scheduledAt;
   final String location;
@@ -661,7 +796,11 @@ class _AppointmentSheetState extends State<_AppointmentSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text('Randevu olustur', style: Theme.of(context).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.w800)),
+            Text('Randevu olustur',
+                style: Theme.of(context)
+                    .textTheme
+                    .titleLarge
+                    ?.copyWith(fontWeight: FontWeight.w800)),
             const SizedBox(height: 12),
             OutlinedButton.icon(
               onPressed: () async {
@@ -674,24 +813,33 @@ class _AppointmentSheetState extends State<_AppointmentSheet> {
                 );
                 if (date == null) return;
                 if (!context.mounted) return;
-                final time = await showTimePicker(context: context, initialTime: TimeOfDay.fromDateTime(_scheduled));
+                final time = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.fromDateTime(_scheduled));
                 if (time == null) return;
                 setState(() {
-                  _scheduled = DateTime(date.year, date.month, date.day, time.hour, time.minute);
+                  _scheduled = DateTime(
+                      date.year, date.month, date.day, time.hour, time.minute);
                 });
               },
               icon: const Icon(Icons.schedule),
               label: Text('Tarih: ${_scheduled.toLocal()}'),
             ),
             const SizedBox(height: 12),
-            TextField(controller: _location, decoration: const InputDecoration(labelText: 'Konum')),
+            TextField(
+                controller: _location,
+                decoration: const InputDecoration(labelText: 'Konum')),
             const SizedBox(height: 12),
-            TextField(controller: _notes, decoration: const InputDecoration(labelText: 'Not (opsiyonel)')),
+            TextField(
+                controller: _notes,
+                decoration:
+                    const InputDecoration(labelText: 'Not (opsiyonel)')),
             const SizedBox(height: 16),
             FilledButton(
               onPressed: () {
                 if (_location.text.trim().isEmpty) {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Konum gerekli')));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Konum gerekli')));
                   return;
                 }
                 Navigator.of(context).pop(_AppointmentDraft(
@@ -745,10 +893,12 @@ class _ReportDialogState extends State<_ReportDialog> {
             items: const [
               DropdownMenuItem(value: 'scam', child: Text('Sahte / scam')),
               DropdownMenuItem(value: 'spam', child: Text('Spam')),
-              DropdownMenuItem(value: 'illegal', child: Text('Ihlal / illegal')),
+              DropdownMenuItem(
+                  value: 'illegal', child: Text('Ihlal / illegal')),
             ],
             onChanged: (v) => setState(() => _category = v),
-            decoration: const InputDecoration(labelText: 'Kategori (opsiyonel)'),
+            decoration:
+                const InputDecoration(labelText: 'Kategori (opsiyonel)'),
           ),
           const SizedBox(height: 12),
           TextField(
@@ -760,14 +910,18 @@ class _ReportDialogState extends State<_ReportDialog> {
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Vazgec')),
+        TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Vazgec')),
         FilledButton(
           onPressed: () {
             if (_reason.text.trim().isEmpty) {
-              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Aciklama gerekli')));
+              ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('Aciklama gerekli')));
               return;
             }
-            Navigator.of(context).pop(_ReportDraft(reason: _reason.text.trim(), category: _category));
+            Navigator.of(context).pop(
+                _ReportDraft(reason: _reason.text.trim(), category: _category));
           },
           child: const Text('Gonder'),
         ),

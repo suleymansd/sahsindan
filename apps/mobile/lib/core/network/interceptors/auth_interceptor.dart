@@ -11,9 +11,15 @@ class AuthInterceptor extends Interceptor {
     required Dio clientDio,
     required Dio refreshDio,
     required SessionInvalidator invalidator,
-  })  : _tokenStore = tokenStore,
+  }) :
+        // Keep the public named arguments and private fields (Dart 3.3 API).
+        // ignore: prefer_initializing_formals
+        _tokenStore = tokenStore,
+        // ignore: prefer_initializing_formals
         _clientDio = clientDio,
+        // ignore: prefer_initializing_formals
         _refreshDio = refreshDio,
+        // ignore: prefer_initializing_formals
         _invalidator = invalidator;
 
   final AccessTokenStore _tokenStore;
@@ -23,12 +29,17 @@ class AuthInterceptor extends Interceptor {
 
   Future<String?>? _refreshing;
 
+  bool _isPublicAuth(String path) => const {
+        '/auth/login', '/auth/register', '/auth/refresh', '/auth/logout',
+        '/auth/forgot-password', '/auth/reset-password',
+      }.contains(path);
+
   @override
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) async {
     options.headers['X-Client'] = 'mobile';
 
     // Avoid adding Authorization to auth endpoints.
-    if (!options.path.startsWith('/auth/')) {
+    if (!_isPublicAuth(options.path)) {
       final token = await _tokenStore.readAccessToken();
       if (token != null && token.isNotEmpty) {
         options.headers['Authorization'] = 'Bearer $token';
@@ -43,7 +54,7 @@ class AuthInterceptor extends Interceptor {
     final status = err.response?.statusCode;
     final req = err.requestOptions;
 
-    if (status == 401 && req.extra['retried'] != true && !req.path.startsWith('/auth/')) {
+    if (status == 401 && req.extra['retried'] != true && !_isPublicAuth(req.path)) {
       try {
         final newToken = await _refreshAccessToken();
         if (newToken == null) {
@@ -53,8 +64,12 @@ class AuthInterceptor extends Interceptor {
 
         final retry = await _retry(req, newToken);
         return handler.resolve(retry);
+      } on DioException catch (refreshError) {
+        if (refreshError.response?.statusCode == 401 || refreshError.response?.statusCode == 403) {
+          _invalidator.invalidate();
+        }
+        return handler.next(err);
       } catch (_) {
-        _invalidator.invalidate();
         return handler.next(err);
       }
     }
@@ -70,7 +85,7 @@ class AuthInterceptor extends Interceptor {
 
         final res = await _refreshDio.post(
           '/auth/refresh',
-          queryParameters: {'refresh_token': refreshToken},
+          data: {'refresh_token': refreshToken},
           options: Options(headers: {'X-Client': 'mobile'}),
         );
         final data = res.data;

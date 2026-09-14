@@ -1,0 +1,102 @@
+{
+  "date": "2026-09-15",
+  "api_postgresql": {
+    "passed": 134,
+    "skipped": 0,
+    "failed": 0,
+    "errors": 0
+  },
+  "api_sqlite": {
+    "passed": 122,
+    "skipped": 12,
+    "failed": 0,
+    "errors": 0
+  },
+  "web_unit": 5,
+  "web_chromium_e2e": 12,
+  "flutter_tests": 14,
+  "coverage_postgresql_percent": 79.19156414762742,
+  "production_containers_started": true,
+  "production_published": false,
+  "smtp_external_tested": false,
+  "smtp_local_capture_tested": true,
+  "audit": {
+    "npm_production_vulnerabilities": 0,
+    "pip_installed_environment_vulnerabilities": 0
+  },
+  "local_https_smoke": {
+    "environment": "isolated local production Docker Compose; HTTPS certificate verified",
+    "checks_passed": [
+      "verified HTTPS readiness",
+      "web login page",
+      "private storage isolation",
+      "admin MFA required",
+      "admin MFA success",
+      "MFA replay rejected",
+      "registration",
+      "role isolation",
+      "document upload",
+      "signed private downloads",
+      "manual verification requires evidence",
+      "six-photo listing publication",
+      "public photo download",
+      "favorites",
+      "persistent messages",
+      "WSS message delivery"
+    ],
+    "real_mail_sent": false,
+    "public_deployment": false
+  },
+  "backup_restore": {
+    "restored_redis_keys": 8,
+    "redis_restore": "passed",
+    "database_restore": "passed",
+    "referenced_files_checked": 10,
+    "upload_files_checked": 11,
+    "encryption": "age authenticated",
+    "live_data_changed": false,
+    "tampered_backup_rejected": true
+  },
+  "mixed_load": {
+    "environment": "disposable local PostgreSQL/Redis, 2 Uvicorn workers; direct API, no TLS/proxy, no uploads or websocket load",
+    "concurrent_sessions": 100,
+    "seeded_listings": 1000,
+    "requests": 23900,
+    "elapsed_seconds": 120.41,
+    "requests_per_second": 198.49,
+    "latency_ms": {
+      "50": 59.6,
+      "95": 119.32,
+      "99": 157.83
+    },
+    "errors": {},
+    "traffic": "paced reads and favorite writes",
+    "methods": {
+      "GET": 19100,
+      "POST": 2400,
+      "DELETE": 2400
+    },
+    "statuses": {
+      "200": 23900
+    },
+    "response_bytes": 154534968,
+    "production_capacity_guarantee": false
+  },
+  "requires_external_access": [
+    "production_host",
+    "domain_dns",
+    "smtp_account",
+    "off_device_backup_target",
+    "mobile_signing_if_store_release"
+  ],
+  "flutter_analysis_issues": 0,
+  "flutter_analysis_method": "same sources in temporary ASCII directory with original dependency paths",
+  "temporary_production_project": "trustmarket-audit; removed after successful validation",
+  "local_development": {
+    "web": "http://127.0.0.1:3000",
+    "api": "http://127.0.0.1:8080",
+    "preserved_users": 6,
+    "preserved_listings": 30,
+    "preserved_messages": 3
+  }
+}

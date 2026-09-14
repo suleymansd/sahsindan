@@ -43,7 +43,7 @@ export function MessageDrawer({ listingId, disabledReason }: { listingId: number
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button disabled={Boolean(disabledReason)}>
+        <Button variant="secondary" disabled={Boolean(disabledReason)}>
           {disabledReason || "Mesaj Gönder"}
         </Button>
       </DialogTrigger>

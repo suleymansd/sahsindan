@@ -4,7 +4,11 @@ from app.db.models import Appointment, AppointmentStatus, Listing, Report, Repor
 
 
 def recalculate_trust_score(db: Session, user_id: int) -> int:
-    user = db.query(User).filter(User.id == user_id).first()
+    """Recalculate within the caller's transaction, serializing changes per user."""
+    # Sessions disable autoflush: counts must include the triggering mutation.
+    db.flush()
+    # NO KEY UPDATE permits concurrent FK checks from appointment/audit inserts.
+    user = db.query(User).filter(User.id == user_id).populate_existing().with_for_update(key_share=True).first()
     if not user:
         return 0
 
@@ -41,7 +45,7 @@ def recalculate_trust_score(db: Session, user_id: int) -> int:
     score = max(0, min(100, score))
     user.trust_score = score
     db.add(user)
-    db.commit()
+    db.flush()
     return score
 
 

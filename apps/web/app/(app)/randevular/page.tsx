@@ -10,6 +10,8 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
+import { toFriendlyError } from "@/lib/errors";
+import { PageControls } from "@/components/page-controls";
 import { apiFetchWithAuth } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 
@@ -27,14 +29,17 @@ const STATUS_LABELS: Record<
 };
 
 export default function AppointmentsPage() {
+  const [page, setPage] = useState(0);
   const { accessToken, user } = useAuth();
+  const [actionError, setActionError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
   const [reschedule, setReschedule] = useState<Record<number, string>>({});
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["appointments"],
+    queryKey: ["appointments", page],
     queryFn: async () => {
       if (!accessToken) return [];
-      const res = await apiFetchWithAuth("/appointments/inbox", accessToken);
+      const res = await apiFetchWithAuth(`/appointments/inbox?limit=50&offset=${page * 50}`, accessToken);
       return res.data as Array<{
         id: number;
         status: string;
@@ -50,14 +55,20 @@ export default function AppointmentsPage() {
   });
 
   async function action(id: number, endpoint: string, body?: Record<string, unknown>) {
-    if (!accessToken) return;
+    if (!accessToken || busy) return;
+    setBusy(true);
+    setActionError(null);
     const params = body?.scheduled_at
       ? `?scheduled_at=${encodeURIComponent(String(body.scheduled_at))}`
       : "";
-    await apiFetchWithAuth(`/appointments/${id}/${endpoint}${params}`, accessToken, {
-      method: "POST",
-    });
-    refetch();
+    try {
+      await apiFetchWithAuth(`/appointments/${id}/${endpoint}${params}`, accessToken, { method: "POST" });
+      await refetch();
+    } catch (error) {
+      setActionError(toFriendlyError(error));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -67,6 +78,8 @@ export default function AppointmentsPage() {
         description="Test sürüşü, ekspertiz ve görüşme randevularını yönet."
       />
 
+      {accessToken && !isLoading && <PageControls page={page} count={data?.length ?? 0} onChange={setPage} />}
+      {actionError && <p role="alert" className="mt-4 text-sm text-danger">{actionError}</p>}
       {!accessToken ? (
         <div className="mt-6 rounded-card border border-border bg-surface p-8 shadow-card">
           <EmptyState
@@ -95,9 +108,9 @@ export default function AppointmentsPage() {
               STATUS_LABELS[appointment.status] ?? { label: appointment.status, variant: "neutral" };
             const isSeller = user?.id === appointment.seller_id;
             const canRespond = appointment.status === "REQUESTED" && isSeller;
-            const canClose = appointment.status === "ACCEPTED" && isSeller;
+            const canClose = ["ACCEPTED", "RESCHEDULED"].includes(appointment.status) && isSeller;
             const canCancel =
-              appointment.status === "REQUESTED" || appointment.status === "ACCEPTED";
+              ["REQUESTED", "ACCEPTED", "RESCHEDULED"].includes(appointment.status);
 
             return (
               <div

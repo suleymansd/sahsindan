@@ -74,7 +74,7 @@ export function RouteGuard({ mode, children }: { mode: GuardMode; children: Reac
         router.replace("/403");
       }
     }
-  }, [mode, pathname, router, status, user]);
+  }, [mode, pathname, router, status, user, isBanned]);
 
   if (status === "loading") return <LoadingScreen />;
 

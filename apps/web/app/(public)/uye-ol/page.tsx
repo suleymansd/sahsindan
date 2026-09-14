@@ -1,5 +1,7 @@
 "use client";
 
+import { safeRedirect } from "@/lib/redirect";
+
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -55,7 +57,7 @@ export default function RegisterPage() {
         profession_category: values.profession || "",
       });
       const redirectTo = searchParams?.get("redirect") || "/app";
-      router.replace(redirectTo.startsWith("/") ? redirectTo : "/app");
+      router.replace(safeRedirect(redirectTo));
     } catch (err) {
       if (err instanceof z.ZodError) {
         setError("Lütfen zorunlu alanları eksiksiz doldurun.");

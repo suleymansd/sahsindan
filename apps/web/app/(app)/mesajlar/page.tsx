@@ -10,9 +10,13 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { SectionHeader } from "@/components/section-header";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { PageControls } from "@/components/page-controls";
 import { API_URL, apiFetchWithAuth } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
+import { toFriendlyError } from "@/lib/errors";
 import { cn } from "@/lib/utils";
+
+type ConversationMessage = { id: number; body: string; sender_id: number; recipient_id?: number; read_at?: string | null; created_at?: string | null };
 
 const QUICK_REPLIES = [
   "Merhaba, ilan hâlâ satışta mı?",
@@ -26,39 +30,40 @@ function formatTime(value?: string | null) {
 }
 
 export default function InboxPage() {
+  const [page, setPage] = useState(0);
   const { accessToken, user } = useAuth();
   const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [history, setHistory] = useState<Record<number, ConversationMessage[]>>({});
+  const [loadingHistory, setLoadingHistory] = useState<number | null>(null);
+  const [sending, setSending] = useState(false);
   const queryClient = useQueryClient();
   const wsRef = useRef<WebSocket | null>(null);
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["threads", user?.id],
+    queryKey: ["threads", user?.id, page],
     queryFn: async () => {
       if (!accessToken) return [];
-      const res = await apiFetchWithAuth("/threads", accessToken);
+      const res = await apiFetchWithAuth(`/threads?limit=50&offset=${page * 50}`, accessToken);
       return res.data as Array<{
         id: number;
         listing_id: number;
         buyer_id: number;
         seller_id: number;
         last_message_at?: string | null;
-        messages: {
-          body: string;
-          sender_id: number;
-          recipient_id?: number;
-          read_at?: string | null;
-          created_at?: string | null;
-        }[];
+        messages: ConversationMessage[];
       }>;
     },
     enabled: Boolean(accessToken),
+    refetchInterval: 30000,
+    refetchIntervalInBackground: false,
   });
 
   useEffect(() => {
     if (!accessToken || !user?.id) return;
 
     const wsBase = API_URL.replace(/^http:/, "ws:").replace(/^https:/, "wss:");
-    const socket = new WebSocket(`${wsBase}/ws/connect?token=${encodeURIComponent(accessToken)}`);
+    const socket = new WebSocket(`${wsBase}/ws/connect`, ["trustmarket", `bearer.${accessToken}`]);
     wsRef.current = socket;
 
     const pingTimer = window.setInterval(() => {
@@ -82,19 +87,47 @@ export default function InboxPage() {
   }, [accessToken, queryClient, user?.id]);
 
   async function sendReply(threadId: number, message: string) {
-    if (!accessToken) return;
-    await apiFetchWithAuth(`/threads/${threadId}/messages`, accessToken, {
-      method: "POST",
-      body: JSON.stringify({ body: message }),
-    });
-    setStatus("Yanıt gönderildi.");
-    refetch();
+    if (!accessToken || sending || !message.trim()) return false;
+    setSending(true);
+    setError(null);
+    setStatus(null);
+    try {
+      await apiFetchWithAuth(`/threads/${threadId}/messages`, accessToken, {
+        method: "POST", body: JSON.stringify({ body: message.trim() }),
+      });
+      setHistory(current => { const next = { ...current }; delete next[threadId]; return next; });
+      setStatus("Yanıt gönderildi.");
+      await refetch();
+      return true;
+    } catch (err) {
+      setError(toFriendlyError(err));
+      return false;
+    } finally {
+      setSending(false);
+    }
+  }
+
+  async function earlierMessages(threadId: number, beforeId: number) {
+    if (!accessToken || loadingHistory !== null) return;
+    setLoadingHistory(threadId);
+    try {
+      const result = await apiFetchWithAuth(`/threads/${threadId}?limit=30&before_id=${beforeId}`, accessToken);
+      setHistory(current => ({ ...current, [threadId]: result.data.messages }));
+    } catch (err) {
+      setError(toFriendlyError(err));
+    } finally {
+      setLoadingHistory(null);
+    }
   }
 
   async function markRead(threadId: number) {
     if (!accessToken) return;
-    await apiFetchWithAuth(`/threads/${threadId}/read`, accessToken, { method: "POST" });
-    refetch();
+    try {
+      await apiFetchWithAuth(`/threads/${threadId}/read`, accessToken, { method: "POST" });
+      await refetch();
+    } catch (err) {
+      setError(toFriendlyError(err));
+    }
   }
 
   return (
@@ -104,6 +137,8 @@ export default function InboxPage() {
         {status && <Badge variant="success">{status}</Badge>}
       </div>
 
+      {error && <p role="alert" className="mt-4 text-sm text-rose-600">{error}</p>}
+      {accessToken && !isLoading && <PageControls page={page} count={data?.length ?? 0} onChange={setPage} />}
       {!accessToken ? (
         <div className="mt-6 rounded-card border border-border bg-surface p-8 shadow-card">
           <EmptyState
@@ -128,6 +163,7 @@ export default function InboxPage() {
       ) : data && data.length ? (
         <div className="mt-8 space-y-4">
           {data.map((thread) => {
+            const shownMessages = history[thread.id] ?? thread.messages;
             const otherUserId =
               thread.buyer_id === user?.id ? thread.seller_id : thread.buyer_id;
             const unreadCount = thread.messages.filter(
@@ -168,7 +204,11 @@ export default function InboxPage() {
                 </div>
 
                 <div className="max-h-[320px] space-y-2 overflow-y-auto bg-surface-2/30 p-4 text-sm">
-                  {thread.messages.slice(-15).map((msg, idx) => {
+                  {(shownMessages.length >= 30 || history[thread.id]) && <div className="flex justify-center gap-3">
+                    <Button variant="ghost" size="sm" disabled={!shownMessages.length || loadingHistory !== null} onClick={() => earlierMessages(thread.id, shownMessages[0].id)}>Önceki mesajlar</Button>
+                    {history[thread.id] && <Button variant="ghost" size="sm" onClick={() => setHistory(current => { const next = { ...current }; delete next[thread.id]; return next; })}>Son mesajlar</Button>}
+                  </div>}
+                  {shownMessages.map((msg, idx) => {
                     const mine = msg.sender_id === user?.id;
                     return (
                       <div
@@ -202,7 +242,7 @@ export default function InboxPage() {
                       </div>
                     );
                   })}
-                  {!thread.messages.length && (
+                  {!shownMessages.length && (
                     <div className="text-center text-xs text-text-muted">
                       Bu konuşmada henüz mesaj yok.
                     </div>
@@ -219,6 +259,7 @@ export default function InboxPage() {
                         key={reply}
                         variant="ghost"
                         size="sm"
+                        disabled={sending}
                         onClick={() => sendReply(thread.id, reply)}
                       >
                         {reply}
@@ -228,11 +269,11 @@ export default function InboxPage() {
 
                   <form
                     className="flex gap-2"
-                    onSubmit={(event) => {
+                    onSubmit={async (event) => {
                       event.preventDefault();
-                      const formData = new FormData(event.currentTarget);
-                      sendReply(thread.id, String(formData.get("message")));
-                      event.currentTarget.reset();
+                      const form = event.currentTarget;
+                      const formData = new FormData(form);
+                      if (await sendReply(thread.id, String(formData.get("message")))) form.reset();
                     }}
                   >
                     <Textarea
@@ -241,7 +282,7 @@ export default function InboxPage() {
                       required
                       className="min-h-[48px] flex-1"
                     />
-                    <Button type="submit" className="shrink-0 self-start">
+                    <Button type="submit" disabled={sending} className="shrink-0 self-start">
                       <SendHorizontal className="h-4 w-4" />
                       Gönder
                     </Button>

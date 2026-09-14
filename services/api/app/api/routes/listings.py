@@ -1,6 +1,7 @@
 from typing import Optional
+import jwt
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, Response, Query
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload, selectinload
 
@@ -8,30 +9,56 @@ from app.core.config import settings
 from app.core.deps import get_current_user, require_verified
 from app.core.rate_limit import rate_limit
 from app.core.response import success
+from app.services.storage_budget import reserve_storage, release_storage
+from app.core.resource_limits import consume_upload_budget
+from app.utils.file_validation import validate_upload
 from app.db.models import (
     CarDetail,
     Favorite,
     Listing,
     ListingPhoto,
     ListingState,
-    StaleState,
     User,
 )
 from app.db.session import get_db
+from app.services.unique_relations import get_or_create_relation
 from app.schemas.listing import ListingCreate, ListingOut, ListingPhotoReorder, ListingUpdate
 from app.services.listing_cache import (
+    cache_version,
     get_cached_public_listings,
     invalidate_listings_cache,
     set_cached_public_listings,
 )
 from app.services.listing_helpers import serialize_listing
+from app.services.marketplace_settings import get_marketplace_settings
 from app.utils.time import utc_now
-from app.utils.storage import scan_file_placeholder, upload_bytes, presigned_url
+from app.utils.storage import upload_bytes, presigned_url, upload_key, read_listing_bytes, delete_bytes
 
 router = APIRouter()
 
 ALLOWED_TYPES = {"image/jpeg", "image/png"}
-MAX_UPLOAD_SIZE = 8 * 1024 * 1024
+
+
+@router.get("/photos/content")
+def photo_content(token: str, db: Session = Depends(get_db, scope="function")):
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=["HS256"],
+                             options={"require": ["purpose", "key", "exp"]})
+        if payload["purpose"] != "listing_photo" or not isinstance(payload["key"], str):
+            raise jwt.InvalidTokenError("Invalid photo token")
+    except jwt.InvalidTokenError as exc:
+        raise HTTPException(status_code=401, detail="Invalid photo token") from exc
+    photo = db.query(ListingPhoto).filter(ListingPhoto.s3_key == payload["key"]).first()
+    if not photo:
+        raise HTTPException(status_code=404, detail="Photo not found")
+    try:
+        content = read_listing_bytes(photo.s3_key)
+    except (FileNotFoundError, ValueError) as exc:
+        raise HTTPException(status_code=404, detail="Photo not found") from exc
+    except Exception as exc:
+        raise HTTPException(status_code=503, detail="Storage unavailable") from exc
+    media_type = "image/png" if photo.s3_key.lower().endswith(".png") else "image/jpeg"
+    return Response(content, media_type=media_type, headers={"X-Content-Type-Options": "nosniff"})
 
 
 def _serialize_listing(listing: Listing) -> dict:
@@ -40,7 +67,7 @@ def _serialize_listing(listing: Listing) -> dict:
 
 @router.get("")
 def list_listings(
-    q: Optional[str] = None,
+    q: Optional[str] = Query(default=None, max_length=200),
     city: Optional[str] = None,
     district: Optional[str] = None,
     brand: Optional[str] = None,
@@ -55,10 +82,12 @@ def list_listings(
     mileage_min: Optional[int] = None,
     mileage_max: Optional[int] = None,
     sort: Optional[str] = "newest",
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0, le=50000),
     include_inactive: bool = False,
     mine: bool = False,
     user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     # Browse is allowed for any authenticated user (including USER_PENDING).
     # Verified is required only for "mine" and "include_inactive" views.
@@ -81,12 +110,13 @@ def list_listings(
         "year_max": year_max,
         "mileage_min": mileage_min,
         "mileage_max": mileage_max,
-        "sort": sort,
+        "sort": sort, "limit": limit, "offset": offset,
     }
+    query_cache_version = cache_version() if use_public_cache else None
     if use_public_cache:
         cached = get_cached_public_listings(cache_filters)
         if cached is not None:
-            return success(cached)
+            return success(cached[:limit], meta={"limit": limit, "offset": offset, "has_more": len(cached) > limit})
 
     query = (
         db.query(Listing)
@@ -99,7 +129,7 @@ def list_listings(
         .filter(Listing.owner_id.isnot(None))
     )
 
-    if mine:
+    if mine or include_inactive:
         query = query.filter(Listing.owner_id == user.id)
     elif not include_inactive:
         query = query.filter(Listing.state == ListingState.PUBLISHED)
@@ -163,15 +193,15 @@ def list_listings(
     else:
         query = query.order_by(Listing.created_at.desc())
 
-    listings = query.all()
+    listings = query.order_by(Listing.id.desc()).offset(offset).limit(limit + 1).all()
     payload = [_serialize_listing(l) for l in listings]
     if use_public_cache:
-        set_cached_public_listings(cache_filters, payload)
-    return success(payload)
+        set_cached_public_listings(cache_filters, payload, version=query_cache_version)
+    return success(payload[:limit], meta={"limit": limit, "offset": offset, "has_more": len(payload) > limit})
 
 
 @router.get("/{listing_id}")
-def get_listing(listing_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db)):
+def get_listing(listing_id: int, user: User = Depends(get_current_user), db: Session = Depends(get_db, scope="function")):
     listing = (
         db.query(Listing)
         .options(
@@ -191,9 +221,14 @@ def get_listing(listing_id: int, user: User = Depends(get_current_user), db: Ses
 
 
 @router.post("")
-def create_listing(payload: ListingCreate, user: User = Depends(require_verified), db: Session = Depends(get_db)):
-    if payload.city != settings.city_lock:
-        raise HTTPException(status_code=400, detail=f"Only {settings.city_lock} is supported right now")
+def create_listing(payload: ListingCreate, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
+    db.query(User).filter(User.id == user.id).with_for_update().first()
+    active_count = db.query(Listing).filter(Listing.owner_id == user.id, Listing.state.in_([ListingState.DRAFT, ListingState.PUBLISHED])).count()
+    if active_count >= settings.max_active_listings_per_user:
+        raise HTTPException(status_code=409, detail="Active listing limit reached")
+    market_settings = get_marketplace_settings(db)
+    if payload.city != market_settings.city_lock:
+        raise HTTPException(status_code=400, detail=f"Only {market_settings.city_lock} is supported right now")
     listing = Listing(
         title=payload.title,
         description=payload.description,
@@ -203,8 +238,7 @@ def create_listing(payload: ListingCreate, user: User = Depends(require_verified
         owner_id=user.id,
     )
     db.add(listing)
-    db.commit()
-    db.refresh(listing)
+    db.flush()
 
     car = CarDetail(listing_id=listing.id, **payload.car_details.model_dump())
     db.add(car)
@@ -220,13 +254,17 @@ def update_listing(
     listing_id: int,
     payload: ListingUpdate,
     user: User = Depends(require_verified),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing or listing.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Listing not found")
 
     data = payload.model_dump(exclude_unset=True)
+    car_details = data.pop("car_details", None)
+    if car_details is not None:
+        for key, value in car_details.items():
+            setattr(listing.car_details, key, value)
     for key, value in data.items():
         setattr(listing, key, value)
     db.add(listing)
@@ -237,10 +275,12 @@ def update_listing(
 
 
 @router.post("/{listing_id}/publish")
-def publish_listing(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def publish_listing(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing or listing.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.state in [ListingState.REJECTED, ListingState.SOLD]:
+        raise HTTPException(status_code=409, detail="Listing cannot be published")
     listing.state = ListingState.PUBLISHED
     listing.last_confirmed_at = utc_now()
     listing.stale_state = None
@@ -251,7 +291,7 @@ def publish_listing(listing_id: int, user: User = Depends(require_verified), db:
 
 
 @router.post("/{listing_id}/mark-sold")
-def mark_sold(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def mark_sold(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing or listing.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Listing not found")
@@ -264,10 +304,12 @@ def mark_sold(listing_id: int, user: User = Depends(require_verified), db: Sessi
 
 
 @router.post("/{listing_id}/confirm-active")
-def confirm_active(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def confirm_active(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing or listing.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Listing not found")
+    if listing.state not in [ListingState.PUBLISHED, ListingState.ARCHIVED]:
+        raise HTTPException(status_code=409, detail="Listing cannot be confirmed")
     listing.last_confirmed_at = utc_now()
     listing.stale_state = None
     if listing.state == ListingState.ARCHIVED:
@@ -279,26 +321,32 @@ def confirm_active(listing_id: int, user: User = Depends(require_verified), db: 
 
 
 @router.post("/{listing_id}/photos", dependencies=[Depends(rate_limit(limit=10, window_seconds=60))])
-async def upload_photo(
+def upload_photo(
     listing_id: int,
     file: UploadFile,
     user: User = Depends(require_verified),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
-    listing = db.query(Listing).filter(Listing.id == listing_id).first()
+    listing = db.query(Listing).filter(Listing.id == listing_id).with_for_update().first()
     if not listing or listing.owner_id != user.id:
         raise HTTPException(status_code=404, detail="Listing not found")
 
     if file.content_type not in ALLOWED_TYPES:
         raise HTTPException(status_code=400, detail="Invalid file type")
 
-    content = await file.read()
-    if len(content) > MAX_UPLOAD_SIZE:
+    market_settings = get_marketplace_settings(db)
+    if db.query(ListingPhoto).filter(ListingPhoto.listing_id == listing_id).count() >= market_settings.photo_max_count:
+        raise HTTPException(status_code=400, detail="Photo count limit reached")
+    max_upload_size = market_settings.photo_max_mb * 1024 * 1024
+    content = file.file.read(max_upload_size + 1)
+    if len(content) > max_upload_size:
         raise HTTPException(status_code=400, detail="File too large")
 
-    scan_file_placeholder(content)
+    consume_upload_budget(user.id, len(content))
+    content = validate_upload(content, file.content_type)
 
-    key = f"listings/{listing_id}/{file.filename}"
+    reserve_storage(db, len(content))
+    key = upload_key(f"listings/{listing_id}", file.content_type)
     stored_key = upload_bytes(key, content, file.content_type)
     if not stored_key:
         raise HTTPException(status_code=503, detail="Storage unavailable")
@@ -309,7 +357,7 @@ async def upload_photo(
         .scalar()
     )
     next_order = (max_order or 0) + 1
-    photo = ListingPhoto(listing_id=listing_id, s3_key=stored_key, sort_order=next_order)
+    photo = ListingPhoto(listing_id=listing_id, s3_key=stored_key, sort_order=next_order, size_bytes=len(content))
     db.add(photo)
     db.commit()
     db.refresh(photo)
@@ -322,7 +370,7 @@ def reorder_photos(
     listing_id: int,
     payload: ListingPhotoReorder,
     user: User = Depends(require_verified),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing or listing.owner_id != user.id:
@@ -351,7 +399,7 @@ def delete_photo(
     listing_id: int,
     photo_id: int,
     user: User = Depends(require_verified),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing or listing.owner_id != user.id:
@@ -365,33 +413,35 @@ def delete_photo(
     if not photo:
         raise HTTPException(status_code=404, detail="Photo not found")
 
+    key, size = photo.s3_key, photo.size_bytes
     db.delete(photo)
     db.commit()
+    try:
+        delete_bytes(key)
+        release_storage(db, size)
+        db.commit()
+    except Exception:
+        db.rollback()  # Keep bytes charged until reconciliation succeeds.
     invalidate_listings_cache()
     return success({"deleted": True})
 
 
 @router.post("/{listing_id}/favorite")
-def favorite_listing(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def favorite_listing(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
-    if not listing:
+    if not listing or (listing.state != ListingState.PUBLISHED and listing.owner_id != user.id):
         raise HTTPException(status_code=404, detail="Listing not found")
-    existing = (
-        db.query(Favorite)
-        .filter(Favorite.user_id == user.id, Favorite.listing_id == listing_id)
-        .first()
-    )
-    if existing:
-        return success({"favorited": True})
-
-    fav = Favorite(user_id=user.id, listing_id=listing_id)
-    db.add(fav)
+    db.query(User).filter(User.id == user.id).with_for_update().first()
+    existing = db.query(Favorite).filter_by(user_id=user.id, listing_id=listing_id).first()
+    if not existing and db.query(Favorite).filter_by(user_id=user.id).count() >= settings.max_favorites_per_user:
+        raise HTTPException(status_code=409, detail="Favorite limit reached")
+    get_or_create_relation(db, Favorite, {"user_id": user.id, "listing_id": listing_id})
     db.commit()
     return success({"favorited": True})
 
 
 @router.delete("/{listing_id}/favorite")
-def unfavorite_listing(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def unfavorite_listing(listing_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     existing = (
         db.query(Favorite)
         .filter(Favorite.user_id == user.id, Favorite.listing_id == listing_id)

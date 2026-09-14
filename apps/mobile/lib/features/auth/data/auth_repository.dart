@@ -10,7 +10,11 @@ class AuthRepository {
   AuthRepository({
     required Dio dio,
     required AccessTokenStore tokenStore,
-  })  : _dio = dio,
+  }) :
+        // Keep the public named arguments and private fields (Dart 3.3 API).
+        // ignore: prefer_initializing_formals
+        _dio = dio,
+        // ignore: prefer_initializing_formals
         _tokenStore = tokenStore;
 
   final Dio _dio;
@@ -31,10 +35,10 @@ class AuthRepository {
     return env.data;
   }
 
-  Future<UserSummary> login({required String email, required String password}) async {
+  Future<UserSummary> login({required String email, required String password, String? otpCode}) async {
     final res = await _dio.post(
       '/auth/login',
-      data: {'email': email, 'password': password},
+      data: {'email': email, 'password': password, if (otpCode != null && otpCode.isNotEmpty) 'otp_code': otpCode},
       options: Options(headers: {'X-Client': 'mobile'}),
     );
     final env = ApiEnvelope.fromJson(res.data as Map<String, dynamic>, (obj) => AuthPayload.fromJson(obj as Map<String, dynamic>));
@@ -81,7 +85,7 @@ class AuthRepository {
 
     final res = await _dio.post(
       '/auth/refresh',
-      queryParameters: {'refresh_token': refreshToken},
+      data: {'refresh_token': refreshToken},
       options: Options(headers: {'X-Client': 'mobile'}),
     );
     final env = ApiEnvelope.fromJson(res.data as Map<String, dynamic>, (obj) => RefreshPayload.fromJson(obj as Map<String, dynamic>));
@@ -107,7 +111,7 @@ class AuthRepository {
       final refreshToken = await _tokenStore.readRefreshToken();
       await _dio.post(
         '/auth/logout',
-        queryParameters: refreshToken != null ? {'refresh_token': refreshToken} : null,
+        data: refreshToken != null ? {'refresh_token': refreshToken} : null,
         options: Options(headers: {'X-Client': 'mobile'}),
       );
     } catch (_) {

@@ -1,33 +1,30 @@
+"""Create the first production administrator interactively; refuses existing addresses."""
+from getpass import getpass
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from app.core.security import hash_password
 from app.db.session import SessionLocal
-from app.db.models import Profile, User, UserRole
-from app.utils.time import utc_now
+from app.db.models import User, Profile, UserRole
+from app.schemas.auth import RegisterRequest
 
 
 def main():
-    db = SessionLocal()
-    try:
-        existing = db.query(User).filter(User.email == "admin@trustmarket.local").first()
-        if existing:
-            print("Admin already exists")
-            return
-        user = User(
-            email="admin@trustmarket.local",
-            phone="5550000001",
-            password_hash=hash_password("Admin123!"),
-            role=UserRole.ADMIN,
-            trust_score=50,
-            last_login_at=utc_now(),
-        )
+    email = input("Admin email: ").strip()
+    phone = input("Admin phone: ").strip()
+    name = input("Admin name: ").strip()
+    password = getpass("Password (minimum 12 characters): ")
+    if len(password) < 12 or password != getpass("Repeat password: "):
+        raise SystemExit("Passwords must match and contain at least 12 characters")
+    payload = RegisterRequest(email=email, phone=phone, password=password, name=name, city="ISTANBUL")
+    with SessionLocal() as db:
+        if db.query(User).filter((User.email == payload.email) | (User.phone == payload.phone)).first():
+            raise SystemExit("An account already exists; no role was changed")
+        user = User(email=payload.email, phone=payload.phone, password_hash=hash_password(password), role=UserRole.ADMIN)
+        user.profile = Profile(name=payload.name, city=payload.city)
         db.add(user)
         db.commit()
-        db.refresh(user)
-        profile = Profile(user_id=user.id, name="Admin", city="ISTANBUL")
-        db.add(profile)
-        db.commit()
-        print("Admin created")
-    finally:
-        db.close()
+    print("Administrator created. Sign in through /giris/admin.")
 
 
 if __name__ == "__main__":

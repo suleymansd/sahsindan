@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from app.core.deps import require_verified
@@ -9,9 +9,25 @@ from app.db.models import Appointment, AppointmentEvent, AppointmentStatus, List
 from app.db.session import get_db
 from app.schemas.appointments import AppointmentCreate
 from app.services.trust import recalculate_trust_score
+from app.services.listing_cache import invalidate_listings_cache
 from app.utils.time import utc_now
 
 router = APIRouter()
+
+ACTIVE_STATUSES = {AppointmentStatus.REQUESTED, AppointmentStatus.ACCEPTED, AppointmentStatus.RESCHEDULED}
+ALLOWED_TRANSITIONS = {
+    AppointmentStatus.ACCEPTED: {AppointmentStatus.REQUESTED},
+    AppointmentStatus.DECLINED: {AppointmentStatus.REQUESTED},
+    AppointmentStatus.RESCHEDULED: ACTIVE_STATUSES,
+    AppointmentStatus.CANCELLED: ACTIVE_STATUSES,
+    AppointmentStatus.COMPLETED: {AppointmentStatus.ACCEPTED, AppointmentStatus.RESCHEDULED},
+    AppointmentStatus.NO_SHOW: {AppointmentStatus.ACCEPTED, AppointmentStatus.RESCHEDULED},
+}
+
+
+def _check_transition(appointment: Appointment, new_status: AppointmentStatus):
+    if appointment.status not in ALLOWED_TRANSITIONS[new_status]:
+        raise HTTPException(status_code=409, detail="Invalid appointment transition")
 
 
 def _log_event(db: Session, appointment: Appointment, actor_id: int, event_type: str, note: str | None = None):
@@ -41,7 +57,7 @@ def _serialize(appointment: Appointment) -> dict:
 def create_appointment(
     payload: AppointmentCreate,
     user: User = Depends(require_verified),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     listing = db.query(Listing).filter(Listing.id == payload.listing_id).first()
     if not listing or listing.state != ListingState.PUBLISHED:
@@ -67,14 +83,14 @@ def create_appointment(
 
 
 @router.get("/inbox")
-def inbox(user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def inbox(user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function"), limit: int = Query(50, ge=1, le=100), offset: int = Query(0, ge=0, le=50000)):
     appointments = (
         db.query(Appointment)
         .filter((Appointment.buyer_id == user.id) | (Appointment.seller_id == user.id))
-        .order_by(Appointment.updated_at.desc())
+        .order_by(Appointment.updated_at.desc(), Appointment.id.desc()).offset(offset).limit(limit + 1)
         .all()
     )
-    return success([_serialize(a) for a in appointments])
+    return success([_serialize(a) for a in appointments[:limit]], meta={"has_more": len(appointments) > limit})
 
 
 def _transition(
@@ -86,19 +102,26 @@ def _transition(
     appointment: Appointment | None = None,
 ):
     if appointment is None:
-        appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
+        appointment = db.query(Appointment).filter(Appointment.id == appointment_id).with_for_update().first()
     if not appointment or user.id not in [appointment.buyer_id, appointment.seller_id]:
         raise HTTPException(status_code=404, detail="Appointment not found")
 
+    _check_transition(appointment, new_status)
+    changed = db.query(Appointment).filter(
+        Appointment.id == appointment.id, Appointment.status == appointment.status,
+    ).update({"status": new_status, "updated_at": utc_now()}, synchronize_session=False)
+    if changed != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Appointment changed; reload and retry")
     appointment.status = new_status
     appointment.updated_at = utc_now()
     _log_event(db, appointment, user.id, new_status.value, note)
     db.add(appointment)
-    db.commit()
-
     if new_status in [AppointmentStatus.COMPLETED, AppointmentStatus.NO_SHOW]:
         recalculate_trust_score(db, appointment.seller_id)
-
+    db.commit()
+    if new_status in [AppointmentStatus.COMPLETED, AppointmentStatus.NO_SHOW]:
+        invalidate_listings_cache()
     return success(_serialize(appointment))
 
 
@@ -108,7 +131,7 @@ def _ensure_seller(appointment: Appointment, user: User):
 
 
 @router.post("/{appointment_id}/accept")
-def accept(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def accept(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
@@ -117,7 +140,7 @@ def accept(appointment_id: int, user: User = Depends(require_verified), db: Sess
 
 
 @router.post("/{appointment_id}/decline")
-def decline(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def decline(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
@@ -126,10 +149,18 @@ def decline(appointment_id: int, user: User = Depends(require_verified), db: Ses
 
 
 @router.post("/{appointment_id}/reschedule")
-def reschedule(appointment_id: int, scheduled_at: datetime, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def reschedule(appointment_id: int, scheduled_at: datetime, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment or user.id not in [appointment.buyer_id, appointment.seller_id]:
         raise HTTPException(status_code=404, detail="Appointment not found")
+    _check_transition(appointment, AppointmentStatus.RESCHEDULED)
+    changed = db.query(Appointment).filter(
+        Appointment.id == appointment.id, Appointment.status == appointment.status,
+    ).update({"status": AppointmentStatus.RESCHEDULED, "scheduled_at": scheduled_at,
+              "updated_at": utc_now()}, synchronize_session=False)
+    if changed != 1:
+        db.rollback()
+        raise HTTPException(status_code=409, detail="Appointment changed; reload and retry")
     appointment.status = AppointmentStatus.RESCHEDULED
     appointment.scheduled_at = scheduled_at
     appointment.updated_at = utc_now()
@@ -140,12 +171,12 @@ def reschedule(appointment_id: int, scheduled_at: datetime, user: User = Depends
 
 
 @router.post("/{appointment_id}/cancel")
-def cancel(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def cancel(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     return _transition(appointment_id, user, db, AppointmentStatus.CANCELLED)
 
 
 @router.post("/{appointment_id}/complete")
-def complete(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def complete(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
@@ -154,7 +185,7 @@ def complete(appointment_id: int, user: User = Depends(require_verified), db: Se
 
 
 @router.post("/{appointment_id}/no-show")
-def no_show(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def no_show(appointment_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment:
         raise HTTPException(status_code=404, detail="Appointment not found")
@@ -163,12 +194,14 @@ def no_show(appointment_id: int, user: User = Depends(require_verified), db: Ses
 
 
 @router.post("/{appointment_id}/rate")
-def rate(appointment_id: int, rating: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def rate(appointment_id: int, rating: int, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     if rating < 1 or rating > 5:
         raise HTTPException(status_code=400, detail="Rating out of range")
     appointment = db.query(Appointment).filter(Appointment.id == appointment_id).first()
     if not appointment or user.id not in [appointment.buyer_id, appointment.seller_id]:
         raise HTTPException(status_code=404, detail="Appointment not found")
+    if appointment.status not in [AppointmentStatus.COMPLETED, AppointmentStatus.NO_SHOW]:
+        raise HTTPException(status_code=409, detail="Appointment cannot be rated yet")
     _log_event(db, appointment, user.id, "RATED", note=f"rating:{rating}")
     db.commit()
     return success({"rated": True})

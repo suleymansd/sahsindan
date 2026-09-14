@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 const Sheet = DialogPrimitive.Root;
 const SheetTrigger = DialogPrimitive.Trigger;
 const SheetClose = DialogPrimitive.Close;
+const SheetTitle = DialogPrimitive.Title;
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
@@ -18,8 +19,9 @@ const SheetContent = React.forwardRef<
     <DialogPrimitive.Overlay className="fixed inset-0 z-50 bg-foreground/45 backdrop-blur-[2px] data-[state=open]:animate-fade-in" />
     <DialogPrimitive.Content
       ref={ref}
+      aria-describedby={undefined}
       className={cn(
-        "fixed right-0 top-0 z-50 h-full w-[92vw] max-w-sm border-l border-border/85 bg-surface/92 p-6 shadow-xl backdrop-blur-xl data-[state=open]:animate-slide-up",
+        "fixed right-0 top-0 z-50 h-full w-[92vw] max-w-sm overflow-y-auto border-l border-border bg-surface p-6 shadow-xl data-[state=open]:animate-slide-up",
         className
       )}
       {...props}
@@ -38,4 +40,4 @@ const SheetContent = React.forwardRef<
 ));
 SheetContent.displayName = "SheetContent";
 
-export { Sheet, SheetTrigger, SheetContent, SheetClose };
+export { Sheet, SheetTrigger, SheetContent, SheetClose, SheetTitle };

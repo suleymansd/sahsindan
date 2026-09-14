@@ -1,5 +1,3 @@
-import os
-
 from sqlalchemy import select, func
 
 from app.core.config import settings
@@ -254,6 +252,8 @@ def _seed_verified_verification(db, *, verified: User):
 
 
 def main():
+    if settings.app_env == "production":
+        raise SystemExit("Demo seed is disabled in production")
     # Ensure settings are loaded and DB URL is present.
     if not settings.database_url:
         raise SystemExit("DATABASE_URL is missing")
@@ -263,7 +263,7 @@ def main():
     try:
         _ensure_system_settings(db)
 
-        admin = _ensure_user(
+        _ensure_user(
             db,
             email="admin@trustmarket.local",
             phone="5550000001",

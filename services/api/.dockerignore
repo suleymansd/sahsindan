@@ -1,0 +1,14 @@
+.venv*
+.env*
+storage
+tests
+.pytest_cache
+.coverage*
+__pycache__
+.run
+*.pyc
+
+scripts/seed*
+scripts/e2e_server.py
+scripts/load_test.py
+scripts/test_postgres.py

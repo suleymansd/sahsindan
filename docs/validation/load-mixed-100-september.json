@@ -1,0 +1,25 @@
+{
+  "environment": "disposable local PostgreSQL/Redis, 2 Uvicorn workers; direct API, no TLS/proxy, no uploads or websocket load",
+  "concurrent_sessions": 100,
+  "seeded_listings": 1000,
+  "requests": 21937,
+  "elapsed_seconds": 121.51,
+  "requests_per_second": 180.53,
+  "latency_ms": {
+    "50": 43.36,
+    "95": 95.91,
+    "99": 4585.24
+  },
+  "traffic": "paced reads and favorite writes",
+  "methods": {
+    "GET": 17522,
+    "POST": 2235,
+    "DELETE": 2180
+  },
+  "statuses": {
+    "200": 21798,
+    "503": 139
+  },
+  "response_bytes": 141116035,
+  "production_capacity_guarantee": false
+}

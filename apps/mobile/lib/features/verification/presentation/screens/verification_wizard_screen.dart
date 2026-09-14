@@ -16,7 +16,6 @@ class VerificationWizardScreen extends ConsumerStatefulWidget {
 }
 
 class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScreen> {
-  final _otp = TextEditingController(text: '123456');
   bool _consent = false;
 
   PlatformFile? _idFront;
@@ -30,7 +29,6 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
 
   @override
   void dispose() {
-    _otp.dispose();
     super.dispose();
   }
 
@@ -53,7 +51,7 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
     try {
       final repo = ref.read(verificationRepositoryProvider);
       final requestId = await repo.submit(
-        phoneOtp: _otp.text.trim(),
+        phoneOtp: '',
         backgroundConsent: _consent,
         professionProof: _profession != null,
       );
@@ -64,7 +62,7 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
 
         final name = file.name;
         final ext = (name.split('.').lastOrNull ?? '').toLowerCase();
-        final ct = (ext == 'pdf') ? 'application/pdf' : 'image/jpeg';
+        final ct = ext == 'png' ? 'image/png' : 'image/jpeg';
 
         await repo.uploadAsset(
           requestId: requestId,
@@ -73,7 +71,7 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
           bytes: bytes,
           contentType: ct,
           onProgress: (sent, total) {
-            if (total <= 0) return;
+            if (!mounted || total <= 0) return;
             setState(() => _progress = sent / total);
           },
         );
@@ -84,12 +82,14 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
       if (_selfie != null) await upload(_selfie!, 'selfie');
       if (_profession != null) await upload(_profession!, 'profession');
 
+      if (!mounted) return;
       setState(() {
         _status = 'Basvurun alinmistir. Inceleme sureci basladi.';
       });
 
       await ref.read(authControllerProvider.notifier).refreshVerificationStatus();
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _status = e.toString();
       });
@@ -148,12 +148,12 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
             : ListView(
                 padding: const EdgeInsets.all(24),
                 children: [
-                  AppGlass(
+                  const AppGlass(
                     radius: 22,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Row(
+                        Row(
                           children: [
                             AppHeroBadgeIcon(icon: Icons.verified_user_rounded, size: 42),
                             SizedBox(width: 10),
@@ -165,35 +165,34 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
                             ),
                           ],
                         ),
-                        const SizedBox(height: 6),
-                        const Text('Gelistirme OTP: 123456', style: TextStyle(color: AppColors.textSecondary)),
-                        const SizedBox(height: 12),
-                        TextField(
-                          controller: _otp,
-                          decoration: const InputDecoration(labelText: 'Telefon OTP', prefixIcon: Icon(Icons.password_rounded)),
-                          keyboardType: TextInputType.number,
-                        ),
+                        SizedBox(height: 6),
+                        Text('Belgeleriniz yetkili ekip tarafından incelenir. Otomatik SMS veya biyometrik doğrulama yapılmaz.', style: TextStyle(color: AppColors.textSecondary, height: 1.5)),
                       ],
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _fileRow('Kimlik on (jpg/png/pdf)', _idFront, () async {
-                    final f = await _pick(allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf']);
+                  const Text('Yalnızca JPEG/PNG. İncelenen belgeler saklama süresi dolunca otomatik silinir.'),
+                  _fileRow('Kimlik on (jpg/png)', _idFront, () async {
+                    final f = await _pick(allowedExtensions: const ['jpg', 'jpeg', 'png']);
+                    if (!mounted) return;
                     setState(() => _idFront = f);
                   }),
                   const SizedBox(height: 10),
-                  _fileRow('Kimlik arka (jpg/png/pdf)', _idBack, () async {
-                    final f = await _pick(allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf']);
+                  _fileRow('Kimlik arka (jpg/png)', _idBack, () async {
+                    final f = await _pick(allowedExtensions: const ['jpg', 'jpeg', 'png']);
+                    if (!mounted) return;
                     setState(() => _idBack = f);
                   }),
                   const SizedBox(height: 10),
                   _fileRow('Selfie (jpg/png)', _selfie, () async {
                     final f = await _pick(allowedExtensions: const ['jpg', 'jpeg', 'png']);
+                    if (!mounted) return;
                     setState(() => _selfie = f);
                   }),
                   const SizedBox(height: 10),
-                  _fileRow('Meslek belgesi (jpg/png/pdf)', _profession, () async {
-                    final f = await _pick(allowedExtensions: const ['jpg', 'jpeg', 'png', 'pdf']);
+                  _fileRow('Meslek belgesi (jpg/png)', _profession, () async {
+                    final f = await _pick(allowedExtensions: const ['jpg', 'jpeg', 'png']);
+                    if (!mounted) return;
                     setState(() => _profession = f);
                   }),
                   const SizedBox(height: 12),
@@ -203,7 +202,7 @@ class _VerificationWizardScreenState extends ConsumerState<VerificationWizardScr
                       contentPadding: EdgeInsets.zero,
                       value: _consent,
                       onChanged: (v) => setState(() => _consent = v ?? false),
-                      title: const Text('Adli kontrol onayini kabul ediyorum (MVP).'),
+                      title: const Text('Belgelerimin hesap doğrulaması için incelenmesini kabul ediyorum.'),
                       activeColor: AppColors.primary,
                     ),
                   ),

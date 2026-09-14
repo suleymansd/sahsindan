@@ -9,27 +9,39 @@ class AppEnv {
   static String get apiBaseUrl {
     // Highest priority: --dart-define=API_BASE_URL=...
     const defineValue = String.fromEnvironment(EnvKeys.apiBaseUrl, defaultValue: '');
-    if (defineValue.trim().isNotEmpty) return defineValue.trim();
+    if (defineValue.trim().isNotEmpty) return _validatedUrl(defineValue.trim());
 
     // Next: .env asset
     try {
       final envValue = dotenv.env[EnvKeys.apiBaseUrl];
-      if (envValue != null && envValue.trim().isNotEmpty) return envValue.trim();
+      if (envValue != null && envValue.trim().isNotEmpty) return _validatedUrl(envValue.trim());
     } catch (_) {
       // dotenv may not be initialized in tests; fall back below.
+    }
+
+    if (kReleaseMode) {
+      throw StateError("Release builds require API_BASE_URL=https://your-domain/api");
     }
 
     // Fallback: platform-based localhost resolution.
     // Android emulator cannot reach host machine on 127.0.0.1; use 10.0.2.2.
     if (!kIsWeb && Platform.isAndroid) {
-      return 'http://10.0.2.2:8080';
+      return 'http://10.0.2.2:8080/api';
     }
-    // Docker-free dev_local.sh runs the API directly on :8080 (no /api prefix).
-    // If you run via Nginx (infra), set API_BASE_URL=http://localhost:8080/api in .env or --dart-define.
-    return 'http://localhost:8080';
+    // Both the direct FastAPI server and Nginx expose routes under /api.
+    return 'http://localhost:8080/api';
+  }
+
+  static String _validatedUrl(String value) {
+    final uri = Uri.tryParse(value);
+    if (kReleaseMode && (uri == null || uri.scheme != "https" || uri.host.isEmpty)) {
+      throw StateError("Release API_BASE_URL must use HTTPS");
+    }
+    return value;
   }
 
   static bool get logNetwork {
+    if (kReleaseMode) return false;
     const defineValue = String.fromEnvironment(EnvKeys.logNetwork, defaultValue: '');
     if (defineValue.trim().isNotEmpty) {
       return defineValue.toLowerCase().trim() == 'true';

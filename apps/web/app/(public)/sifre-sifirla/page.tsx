@@ -1,21 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { CheckCircle2, Eye, EyeOff, Loader2, LockKeyhole } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
+import { toFriendlyError } from "@/lib/errors";
 
 export default function ResetPage() {
+  const [token, setToken] = useState("");
+  useEffect(() => { setToken(new URLSearchParams(window.location.search).get("token") || ""); }, []);
   const [message, setMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
+    setError(null);
+    try {
     const formData = new FormData(event.currentTarget);
     await apiFetch("/auth/reset-password", {
       method: "POST",
@@ -25,7 +31,8 @@ export default function ResetPage() {
       }),
     });
     setMessage("Şifren güncellendi. Yeni şifrenle giriş yapabilirsin.");
-    setLoading(false);
+    } catch (cause) { setError(toFriendlyError(cause)); }
+    finally { setLoading(false); }
   }
 
   return (
@@ -41,7 +48,7 @@ export default function ResetPage() {
           E-postana gelen sıfırlama kodu ve yeni şifrenle devam et.
         </p>
 
-        <form className="mt-7 space-y-4" onSubmit={handleSubmit} noValidate>
+        <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-1.5">
             <label htmlFor="token" className="text-sm font-medium text-foreground">
               Sıfırlama kodu
@@ -49,6 +56,8 @@ export default function ResetPage() {
             <Input
               id="token"
               name="token"
+              value={token}
+              onChange={(event) => setToken(event.target.value)}
               placeholder="E-postadaki kod"
               autoComplete="one-time-code"
               required
@@ -66,6 +75,7 @@ export default function ResetPage() {
                 type={showPassword ? "text" : "password"}
                 placeholder="En az 8 karakter"
                 autoComplete="new-password"
+                minLength={8}
                 required
                 className="pr-10"
               />
@@ -99,6 +109,7 @@ export default function ResetPage() {
           </div>
         )}
 
+        {error && <p role="alert" className="mt-4 rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{error}</p>}
         <div className="mt-6 border-t border-border pt-5 text-center text-sm">
           <Link href="/giris" className="font-semibold text-primary hover:underline">
             ← Giriş panellerine dön

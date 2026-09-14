@@ -5,7 +5,7 @@ Closed, verified-only marketplace for car listings in Istanbul. Built to elimina
 ## Monorepo Structure
 
 ```
-/apps/web        Next.js 14 + Tailwind + shadcn-style components
+/apps/web        Next.js 15 + Tailwind + shadcn-style components
 /apps/mobile     Flutter + Riverpod
 /services/api    FastAPI + SQLAlchemy 2 + Alembic
 /infra           docker-compose, nginx, scripts
@@ -47,6 +47,7 @@ pnpm dev
 
 ```bash
 cd apps/mobile
+cp .env.example .env # first run only; preserve an existing .env
 flutter pub get
 flutter run
 ```
@@ -87,10 +88,19 @@ curl -X GET http://localhost:8080/api/listings \
 
 ```bash
 cd services/api
-pytest
+python -m pip install -r requirements-dev.txt
+python -m pytest --cov=app
 ```
 
 ## Docker-Free API (Local SQLite)
+
+Web checks: `cd apps/web && npm run lint && npm run typecheck && npm run build`.
+Browser tests: install Chromium with `npx playwright install chromium`, then run
+`npm run test:e2e` from `apps/web`. Set `API_PYTHON` to your API virtualenv's Python
+if necessary. Tests start disposable API data on port 8091 and the web app on 3080.
+They build into `.next-e2e`, preserving the normal web build.
+
+Audit findings, limitations and prioritized next steps: [docs/AUDIT_REPORT_TR.md](docs/AUDIT_REPORT_TR.md).
 
 Docker calistiramiyorsan (veya hizli smoke test icin), API'yi SQLite ile host'ta calistirabilirsin:
 
@@ -122,3 +132,11 @@ services/api/scripts/dev_local.sh
 - Payments + escrow
 - KYC risk scoring
 - Insurance/vehicle history APIs
+
+## Production readiness
+
+- [Güncel denetim, test ve üretim doğrulama raporu](docs/FINAL_READINESS_TR.md)
+- [Yayın, maliyet sınırları ve yedekleme kılavuzu](docs/YAYIN_KILAVUZU_TR.md)
+- Önceki denetim bulguları: [AUDIT_REPORT_TR.md](docs/AUDIT_REPORT_TR.md)
+
+Üretim için `infra/compose.production.yml` kullanılır. Yerel geliştirme Compose dosyası üretim yapılandırması değildir. Ücretli AI/SMS hizmeti etkin değildir; barındırma ve trafik maliyetinin sıfır olacağı garanti edilmez.

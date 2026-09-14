@@ -8,14 +8,14 @@ import { AuthProvider } from "@/lib/auth";
 import { ToastProvider } from "@/components/toast";
 
 export function Providers({ children }: { children: React.ReactNode }) {
-  const [queryClient] = useState(() => new QueryClient());
+  const [queryClient] = useState(() => new QueryClient({ defaultOptions: { queries: { staleTime: 30000, retry: false, refetchOnWindowFocus: false }, mutations: { retry: false } } }));
 
   return (
     <QueryClientProvider client={queryClient}>
       <ToastProvider>
         <AuthProvider>{children}</AuthProvider>
       </ToastProvider>
-      <ReactQueryDevtools initialIsOpen={false} />
+      {process.env.NEXT_PUBLIC_SHOW_DEVTOOLS === "1" && <ReactQueryDevtools initialIsOpen={false} />}
     </QueryClientProvider>
   );
 }

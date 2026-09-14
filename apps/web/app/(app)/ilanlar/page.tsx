@@ -1,30 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
-import {
-  Car,
-  Home,
-  Wrench,
-  Search,
-  SlidersHorizontal,
-  X,
-  Filter,
-  RotateCcw,
-} from "lucide-react";
+import { Search, SlidersHorizontal, X, Filter, RotateCcw } from "lucide-react";
 
 import { ListingCard, type Listing } from "@/components/listing-card";
-import { CategoryCard } from "@/components/category-card";
 import { FilterChips } from "@/components/filter-chips";
-import { SectionHeader } from "@/components/section-header";
-import { TrustBand } from "@/components/trust-band";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import { apiFetchWithAuth } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { strings } from "@/lib/strings.tr";
@@ -54,7 +47,16 @@ const BRANDS = [
 const BRAND_MODELS: Record<string, string[]> = {
   "Alfa Romeo": ["Giulia", "Stelvio", "Tonale"],
   Audi: ["A3", "A4", "A5", "A6", "Q3", "Q5", "Q7"],
-  BMW: ["1 Series", "2 Series", "3 Series", "4 Series", "5 Series", "X1", "X3", "X5"],
+  BMW: [
+    "1 Series",
+    "2 Series",
+    "3 Series",
+    "4 Series",
+    "5 Series",
+    "X1",
+    "X3",
+    "X5",
+  ],
   Chevrolet: ["Cruze", "Malibu", "Trax"],
   Fiat: ["Egea", "Tipo", "500"],
   Ford: ["Focus", "Fiesta", "Mondeo", "Kuga"],
@@ -83,7 +85,16 @@ const FUELS = [
   { label: "Elektrik", value: "Electric" },
   { label: "LPG", value: "LPG" },
 ];
-const COLORS = ["Beyaz", "Siyah", "Gri", "Kırmızı", "Mavi", "Yeşil", "Turuncu", "Sarı"];
+const COLORS = [
+  "Beyaz",
+  "Siyah",
+  "Gri",
+  "Kırmızı",
+  "Mavi",
+  "Yeşil",
+  "Turuncu",
+  "Sarı",
+];
 
 const SORT_OPTIONS = [
   { value: "newest", label: "En yeni" },
@@ -136,7 +147,13 @@ const SELECT_CLASS =
 
 const LABEL_CLASS = "text-xs font-semibold text-foreground";
 
-function FieldLabel({ htmlFor, children }: { htmlFor: string; children: React.ReactNode }) {
+function FieldLabel({
+  htmlFor,
+  children,
+}: {
+  htmlFor: string;
+  children: React.ReactNode;
+}) {
   return (
     <label htmlFor={htmlFor} className={LABEL_CLASS}>
       {children}
@@ -155,14 +172,15 @@ function FiltersPanel({
   onApply: () => void;
   onClear: () => void;
 }) {
+  const prefix = useId();
   return (
     <div className="space-y-5">
       <div className="space-y-1.5">
-        <FieldLabel htmlFor="q">Anahtar kelime</FieldLabel>
+        <FieldLabel htmlFor={`${prefix}-q`}>Anahtar kelime</FieldLabel>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
           <Input
-            id="q"
+            id={`${prefix}-q`}
             placeholder={strings.listings.searchPlaceholder}
             value={filters.q}
             onChange={(event) => onChange({ q: event.target.value })}
@@ -173,9 +191,9 @@ function FiltersPanel({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
         <div className="space-y-1.5">
-          <FieldLabel htmlFor="city">Şehir</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-city`}>Şehir</FieldLabel>
           <select
-            id="city"
+            id={`${prefix}-city`}
             className={SELECT_CLASS}
             value={filters.city}
             onChange={(event) => onChange({ city: event.target.value })}
@@ -185,9 +203,9 @@ function FiltersPanel({
           </select>
         </div>
         <div className="space-y-1.5">
-          <FieldLabel htmlFor="district">İlçe</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-district`}>İlçe</FieldLabel>
           <Input
-            id="district"
+            id={`${prefix}-district`}
             placeholder="Örn. Kadıköy"
             value={filters.district}
             onChange={(event) => onChange({ district: event.target.value })}
@@ -197,12 +215,14 @@ function FiltersPanel({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
         <div className="space-y-1.5">
-          <FieldLabel htmlFor="brand">Marka</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-brand`}>Marka</FieldLabel>
           <select
-            id="brand"
+            id={`${prefix}-brand`}
             className={SELECT_CLASS}
             value={filters.brand}
-            onChange={(event) => onChange({ brand: event.target.value, model: "" })}
+            onChange={(event) =>
+              onChange({ brand: event.target.value, model: "" })
+            }
           >
             <option value="">Tüm markalar</option>
             {BRANDS.map((brand) => (
@@ -214,9 +234,9 @@ function FiltersPanel({
         </div>
         {filters.brand && BRAND_MODELS[filters.brand] && (
           <div className="space-y-1.5">
-            <FieldLabel htmlFor="model">Model</FieldLabel>
+            <FieldLabel htmlFor={`${prefix}-model`}>Model</FieldLabel>
             <select
-              id="model"
+              id={`${prefix}-model`}
               className={SELECT_CLASS}
               value={filters.model}
               onChange={(event) => onChange({ model: event.target.value })}
@@ -238,12 +258,14 @@ function FiltersPanel({
           <Input
             type="number"
             placeholder="Min"
+            aria-label="En düşük model yılı"
             value={filters.year_min}
             onChange={(event) => onChange({ year_min: event.target.value })}
           />
           <Input
             type="number"
             placeholder="Max"
+            aria-label="En yüksek model yılı"
             value={filters.year_max}
             onChange={(event) => onChange({ year_max: event.target.value })}
           />
@@ -256,12 +278,14 @@ function FiltersPanel({
           <Input
             type="number"
             placeholder="Min km"
+            aria-label="En düşük kilometre"
             value={filters.mileage_min}
             onChange={(event) => onChange({ mileage_min: event.target.value })}
           />
           <Input
             type="number"
             placeholder="Max km"
+            aria-label="En yüksek kilometre"
             value={filters.mileage_max}
             onChange={(event) => onChange({ mileage_max: event.target.value })}
           />
@@ -274,12 +298,14 @@ function FiltersPanel({
           <Input
             type="number"
             placeholder="Min"
+            aria-label="En düşük fiyat"
             value={filters.min_price}
             onChange={(event) => onChange({ min_price: event.target.value })}
           />
           <Input
             type="number"
             placeholder="Max"
+            aria-label="En yüksek fiyat"
             value={filters.max_price}
             onChange={(event) => onChange({ max_price: event.target.value })}
           />
@@ -288,9 +314,9 @@ function FiltersPanel({
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-1">
         <div className="space-y-1.5">
-          <FieldLabel htmlFor="transmission">Vites</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-transmission`}>Vites</FieldLabel>
           <select
-            id="transmission"
+            id={`${prefix}-transmission`}
             className={SELECT_CLASS}
             value={filters.transmission}
             onChange={(event) => onChange({ transmission: event.target.value })}
@@ -304,9 +330,9 @@ function FiltersPanel({
           </select>
         </div>
         <div className="space-y-1.5">
-          <FieldLabel htmlFor="fuel">Yakıt</FieldLabel>
+          <FieldLabel htmlFor={`${prefix}-fuel`}>Yakıt</FieldLabel>
           <select
-            id="fuel"
+            id={`${prefix}-fuel`}
             className={SELECT_CLASS}
             value={filters.fuel}
             onChange={(event) => onChange({ fuel: event.target.value })}
@@ -322,9 +348,9 @@ function FiltersPanel({
       </div>
 
       <div className="space-y-1.5">
-        <FieldLabel htmlFor="color">Renk</FieldLabel>
+        <FieldLabel htmlFor={`${prefix}-color`}>Renk</FieldLabel>
         <select
-          id="color"
+          id={`${prefix}-color`}
           className={SELECT_CLASS}
           value={filters.color}
           onChange={(event) => onChange({ color: event.target.value })}
@@ -357,7 +383,9 @@ export default function ListingsPage() {
   const searchParams = useSearchParams();
 
   const canBrowse =
-    user?.role === "USER_VERIFIED" || user?.role === "ADMIN" || user?.role === "MODERATOR";
+    user?.role === "USER_VERIFIED" ||
+    user?.role === "ADMIN" ||
+    user?.role === "MODERATOR";
 
   const initialFilters = useMemo<Filters>(
     () => ({
@@ -377,65 +405,45 @@ export default function ListingsPage() {
       color: searchParams?.get("color") || "",
       sort: searchParams?.get("sort") || "newest",
     }),
-    [searchParams]
+    [searchParams],
   );
 
   const [filters, setFilters] = useState<Filters>(initialFilters);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [page, setPage] = useState(0);
 
   useEffect(() => {
     setFilters(initialFilters);
+    setPage(0);
   }, [initialFilters]);
 
   const queryParams = useMemo(() => {
     const params = new URLSearchParams();
-    Object.entries(filters).forEach(([key, value]) => {
+    Object.entries(initialFilters).forEach(([key, value]) => {
       if (value) params.set(key, value);
     });
     return params.toString();
-  }, [filters]);
+  }, [initialFilters]);
 
   const {
-    data: listings,
+    data,
     isLoading,
     isError,
     refetch,
   } = useQuery({
-    queryKey: ["listings", queryParams],
+    queryKey: ["listings", queryParams, page],
     queryFn: async () => {
-      if (!accessToken) return [] as Listing[];
-      const res = await apiFetchWithAuth(`/listings?${queryParams}`, accessToken);
-      return res.data as Listing[];
+      if (!accessToken) return { items: [] as Listing[], hasMore: false };
+      const res = await apiFetchWithAuth(
+        `/listings?${queryParams}&limit=24&offset=${page * 24}`,
+        accessToken,
+      );
+      return { items: res.data as Listing[], hasMore: Boolean(res.meta?.has_more) };
     },
     enabled: Boolean(accessToken && canBrowse),
   });
 
-  const {
-    data: favorites,
-    isLoading: favoritesLoading,
-  } = useQuery({
-    queryKey: ["favorites-preview"],
-    queryFn: async () => {
-      if (!accessToken) return [] as Listing[];
-      const res = await apiFetchWithAuth("/favorites", accessToken);
-      return res.data as Listing[];
-    },
-    enabled: Boolean(accessToken && canBrowse),
-  });
-
-  const [recentListings, setRecentListings] = useState<
-    { id: number; title: string; price: number; city: string; district: string; photo: string; meta?: string }[]
-  >([]);
-
-  useEffect(() => {
-    try {
-      const stored = JSON.parse(localStorage.getItem("recentListings") || "[]");
-      if (Array.isArray(stored)) setRecentListings(stored);
-    } catch {
-      setRecentListings([]);
-    }
-  }, []);
-
-  const featuredListings = useMemo(() => (listings ? listings.slice(0, 8) : []), [listings]);
+  const listings = data?.items;
   const totalCount = listings?.length ?? 0;
 
   function syncFilters(next: Filters) {
@@ -445,7 +453,8 @@ export default function ListingsPage() {
       if (value) params.set(key, value);
     });
     const query = params.toString();
-    router.push(query ? `/ilanlar?${query}` : "/ilanlar");
+    router.push(query ? `/ilanlar?${query}` : "/ilanlar", { scroll: false });
+    setFiltersOpen(false);
   }
 
   const handleApply = () => syncFilters(filters);
@@ -461,327 +470,266 @@ export default function ListingsPage() {
 
   const activeFilters = useMemo(() => {
     const items: Array<{ key: keyof Filters; label: string }> = [];
-    if (filters.brand) items.push({ key: "brand", label: `Marka: ${filters.brand}` });
-    if (filters.model) items.push({ key: "model", label: `Model: ${filters.model}` });
-    if (filters.district) items.push({ key: "district", label: `İlçe: ${filters.district}` });
-    if (filters.year_min) items.push({ key: "year_min", label: `Yıl ≥ ${filters.year_min}` });
-    if (filters.year_max) items.push({ key: "year_max", label: `Yıl ≤ ${filters.year_max}` });
-    if (filters.mileage_min) items.push({ key: "mileage_min", label: `KM ≥ ${filters.mileage_min}` });
-    if (filters.mileage_max) items.push({ key: "mileage_max", label: `KM ≤ ${filters.mileage_max}` });
-    if (filters.min_price) items.push({ key: "min_price", label: `₺ ≥ ${filters.min_price}` });
-    if (filters.max_price) items.push({ key: "max_price", label: `₺ ≤ ${filters.max_price}` });
-    if (filters.transmission) {
+    if (initialFilters.brand)
+      items.push({ key: "brand", label: `Marka: ${initialFilters.brand}` });
+    if (initialFilters.model)
+      items.push({ key: "model", label: `Model: ${initialFilters.model}` });
+    if (initialFilters.district)
+      items.push({
+        key: "district",
+        label: `İlçe: ${initialFilters.district}`,
+      });
+    if (initialFilters.year_min)
+      items.push({
+        key: "year_min",
+        label: `Yıl ≥ ${initialFilters.year_min}`,
+      });
+    if (initialFilters.year_max)
+      items.push({
+        key: "year_max",
+        label: `Yıl ≤ ${initialFilters.year_max}`,
+      });
+    if (initialFilters.mileage_min)
+      items.push({
+        key: "mileage_min",
+        label: `KM ≥ ${initialFilters.mileage_min}`,
+      });
+    if (initialFilters.mileage_max)
+      items.push({
+        key: "mileage_max",
+        label: `KM ≤ ${initialFilters.mileage_max}`,
+      });
+    if (initialFilters.min_price)
+      items.push({
+        key: "min_price",
+        label: `₺ ≥ ${initialFilters.min_price}`,
+      });
+    if (initialFilters.max_price)
+      items.push({
+        key: "max_price",
+        label: `₺ ≤ ${initialFilters.max_price}`,
+      });
+    if (initialFilters.transmission) {
       const label =
-        TRANSMISSIONS.find((item) => item.value === filters.transmission)?.label ??
-        filters.transmission;
+        TRANSMISSIONS.find((item) => item.value === initialFilters.transmission)
+          ?.label ?? initialFilters.transmission;
       items.push({ key: "transmission", label });
     }
-    if (filters.fuel) {
-      const label = FUELS.find((item) => item.value === filters.fuel)?.label ?? filters.fuel;
+    if (initialFilters.fuel) {
+      const label =
+        FUELS.find((item) => item.value === initialFilters.fuel)?.label ??
+        initialFilters.fuel;
       items.push({ key: "fuel", label });
     }
-    if (filters.color) items.push({ key: "color", label: filters.color });
+    if (initialFilters.color)
+      items.push({ key: "color", label: initialFilters.color });
     return items;
-  }, [filters]);
+  }, [initialFilters]);
 
   return (
-    <div className="container pb-16">
-      <div className="sticky top-[72px] z-30 -mx-4 border-b border-border bg-background/90 px-4 py-4 backdrop-blur-md md:-mx-6 md:px-6">
-        <div className="space-y-3">
-          <div className="flex flex-wrap items-end justify-between gap-3">
-            <div>
-              <h1 className="font-display text-display-sm font-bold tracking-tight text-foreground">
-                {strings.listings.title}
-              </h1>
-              <p className="text-body-sm text-text-muted">{strings.listings.subtitle}</p>
-            </div>
-            <div className="text-xs text-text-muted">
-              <span className="font-semibold text-foreground">{totalCount}</span> ilan
-            </div>
-          </div>
-
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              handleApply();
-            }}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <div className="relative min-w-[220px] flex-1">
-              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
-              <Input
-                placeholder={strings.listings.searchPlaceholder}
-                value={filters.q}
-                onChange={(event) => setFilters((prev) => ({ ...prev, q: event.target.value }))}
-                className="pl-9"
-              />
-            </div>
-            <select
-              className={`${SELECT_CLASS} w-auto min-w-[160px]`}
-              value={filters.sort}
-              onChange={(event) => {
-                const next = { ...filters, sort: event.target.value };
-                syncFilters(next);
-              }}
-            >
-              {SORT_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <Button type="submit">
-              <Search className="h-4 w-4" />
-              Ara
-            </Button>
-            <Sheet>
-              <SheetTrigger asChild>
-                <Button variant="outline" className="lg:hidden">
-                  <SlidersHorizontal className="h-4 w-4" />
-                  Filtreler
-                </Button>
-              </SheetTrigger>
-              <SheetContent>
-                <div>
-                  <h2 className="font-display text-title-lg font-semibold">Filtreler</h2>
-                  <p className="text-xs text-text-muted">İstediğin aracı daralt</p>
-                </div>
-                <div className="mt-5">
-                  <FiltersPanel
-                    filters={filters}
-                    onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
-                    onApply={handleApply}
-                    onClear={handleClear}
-                  />
-                </div>
-              </SheetContent>
-            </Sheet>
-          </form>
-
-          <FilterChips
-            chips={[
-              { label: "İstanbul", onClick: () => applyQuickFilter({ city: "ISTANBUL" }) },
-              { label: "0–500K ₺", onClick: () => applyQuickFilter({ max_price: "500000" }) },
-              { label: "2018+", onClick: () => applyQuickFilter({ year_min: "2018" }) },
-              { label: "Otomatik", onClick: () => applyQuickFilter({ transmission: "Automatic" }) },
-              { label: "Dizel", onClick: () => applyQuickFilter({ fuel: "Diesel" }) },
-              { label: "Benzin", onClick: () => applyQuickFilter({ fuel: "Gasoline" }) },
-            ]}
-          />
-
-          {activeFilters.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5 text-xs">
-              <span className="text-text-muted">Uygulanan:</span>
-              {activeFilters.map((filter) => (
-                <button
-                  key={filter.key}
-                  type="button"
-                  onClick={() => applyQuickFilter({ [filter.key]: "" } as Partial<Filters>)}
-                  className="group inline-flex items-center gap-1 rounded-full border border-border bg-surface px-2.5 py-1 font-medium text-foreground transition-colors hover:border-border-strong"
-                >
-                  {filter.label}
-                  <X className="h-3 w-3 text-text-muted group-hover:text-danger" />
-                </button>
-              ))}
-              <button
-                type="button"
-                onClick={handleClear}
-                className="inline-flex items-center gap-1 rounded-full border border-dashed border-border px-2.5 py-1 text-text-muted transition-colors hover:text-foreground"
-              >
-                <RotateCcw className="h-3 w-3" />
-                Temizle
-              </button>
-            </div>
-          )}
+    <div className="container py-7 sm:py-9">
+      <nav
+        aria-label="İçerik yolu"
+        className="mb-6 flex items-center gap-2 text-xs text-text-muted"
+      >
+        <Link href="/app" className="hover:text-foreground">
+          Keşfet
+        </Link>
+        <span>/</span>
+        <span>Otomobil ilanları</span>
+      </nav>
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="market-eyebrow text-accent">SANA UYGUN ARACI BUL</p>
+          <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
+            Otomobil ilanları
+          </h1>
+          <p className="mt-2 text-sm text-text-muted">
+            İstanbul’da yeni bir yolculuğa başla.
+          </p>
         </div>
       </div>
-
-      {!canBrowse ? (
-        <div className="mt-10 rounded-card border border-border bg-surface p-12 shadow-card">
-          <EmptyState
-            icon={accessToken ? Car : Search}
-            title={accessToken ? strings.listings.verificationRequired : strings.listings.loginRequired}
-            description={
-              accessToken
-                ? strings.listings.verificationRequiredDescription
-                : strings.listings.loginRequiredDescription
+      <form
+        onSubmit={(event) => {
+          event.preventDefault();
+          handleApply();
+        }}
+        className="my-6 flex flex-wrap gap-2"
+      >
+        <div className="relative min-w-0 flex-1">
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
+          <Input
+            aria-label="İlanlarda ara"
+            placeholder={strings.listings.searchPlaceholder}
+            value={filters.q}
+            onChange={(event) =>
+              setFilters((prev) => ({ ...prev, q: event.target.value }))
             }
+            className="h-12 bg-surface pl-11"
           />
         </div>
-      ) : (
-        <>
-          <section className="mt-8 space-y-5">
-            <SectionHeader title={UI.sections.categories} description="Şimdilik otomobil ile başlıyoruz." />
-            <div className="grid gap-4 md:grid-cols-3">
-              <CategoryCard
-                title="Araç"
-                description="Premium doğrulamalı otomobil ilanları."
-                icon={<Car size={20} />}
-                href="/ilanlar"
-              />
-              <CategoryCard
-                title="Emlak"
-                description="Yakında sadece doğrulanmış emlak ilanları."
-                icon={<Home size={20} />}
-                disabled
-              />
-              <CategoryCard
-                title="Yedek Parça"
-                description="Doğrulanmış satıcılardan parça satışları."
-                icon={<Wrench size={20} />}
-                disabled
-              />
+        <Button type="submit" className="h-12 px-6">
+          Ara
+          <Search className="h-4 w-4" />
+        </Button>
+        <Sheet open={filtersOpen} onOpenChange={setFiltersOpen}>
+          <SheetTrigger asChild>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-12 lg:hidden"
+              aria-label="Filtreleri aç"
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filtreler</span>
+            </Button>
+          </SheetTrigger>
+          <SheetContent>
+            <SheetTitle className="mb-6 text-lg font-semibold">
+              Filtreler
+            </SheetTitle>
+            <FiltersPanel
+              filters={filters}
+              onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+              onApply={handleApply}
+              onClear={handleClear}
+            />
+          </SheetContent>
+        </Sheet>
+      </form>
+      <FilterChips
+        chips={[
+          {
+            label: "Otomatik",
+            onClick: () => applyQuickFilter({ transmission: "Automatic" }),
+          },
+          {
+            label: "Elektrikli",
+            onClick: () => applyQuickFilter({ fuel: "Electric" }),
+          },
+          {
+            label: "2018 ve üzeri",
+            onClick: () => applyQuickFilter({ year_min: "2018" }),
+          },
+          {
+            label: "500.000 TL’ye kadar",
+            onClick: () => applyQuickFilter({ max_price: "500000" }),
+          },
+        ]}
+      />
+      <div className="mt-8 grid items-start gap-7 lg:grid-cols-[240px_minmax(0,1fr)]">
+        <aside className="hidden rounded-xl border border-border bg-surface p-5 lg:block">
+          <div className="mb-5 flex items-center justify-between border-b border-border pb-4">
+            <h2 className="flex items-center gap-2 text-sm font-semibold">
+              <SlidersHorizontal className="h-4 w-4" />
+              Filtreler
+            </h2>
+            <button
+              onClick={handleClear}
+              className="text-xs text-text-muted hover:text-foreground"
+            >
+              Sıfırla
+            </button>
+          </div>
+          <FiltersPanel
+            filters={filters}
+            onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
+            onApply={handleApply}
+            onClear={handleClear}
+          />
+        </aside>
+        <section className="min-w-0">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <p aria-live="polite" className="text-sm text-text-muted">
+              {isLoading ? (
+                "İlanlar yükleniyor…"
+              ) : (
+                <>
+                  <strong className="font-semibold text-foreground">
+                    {totalCount} ilan
+                  </strong>{" "}
+                  bulundu
+                </>
+              )}
+            </p>
+            <label className="flex items-center gap-2 text-xs text-text-muted">
+              <span>Sırala</span>
+              <select
+                aria-label="İlanları sırala"
+                className="h-10 rounded-lg border border-border bg-surface px-3 text-xs text-foreground"
+                value={initialFilters.sort}
+                onChange={(event) =>
+                  syncFilters({ ...initialFilters, sort: event.target.value })
+                }
+              >
+                {SORT_OPTIONS.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {activeFilters.length > 0 && (
+            <div className="mb-5 flex flex-wrap gap-2">
+              {activeFilters.map((item) => (
+                <button
+                  key={item.key}
+                  onClick={() => applyQuickFilter({ [item.key]: "" })}
+                  className="inline-flex items-center gap-2 rounded-full bg-primary-light px-3 py-1.5 text-xs text-foreground"
+                  aria-label={`${item.label} filtresini kaldır`}
+                >
+                  {item.label}
+                  <X className="h-3 w-3" />
+                </button>
+              ))}
             </div>
-          </section>
-
-          <section className="mt-12 space-y-5">
-            <SectionHeader
-              title={UI.sections.featured}
-              description="Editör seçkisi, hızlı yanıtlayan satıcılar."
-            />
-            {isLoading ? (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {Array.from({ length: 4 }).map((_, idx) => (
-                  <Skeleton key={idx} className="h-72" />
-                ))}
-              </div>
-            ) : isError ? (
-              <div className="flex items-center justify-between rounded-card border border-border bg-surface p-5 text-sm text-text-muted shadow-card">
-                İlanlar yüklenemedi.
-                <Button variant="outline" size="sm" onClick={() => refetch()}>
-                  Tekrar dene
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-                {featuredListings.map((listing) => (
-                  <ListingCard key={listing.id} listing={listing} />
-                ))}
-              </div>
-            )}
-          </section>
-
-          <section className="mt-12 space-y-5">
-            <SectionHeader
-              title={UI.sections.favorites}
-              description="Kaydettiğin ilanlar burada hızlı erişimde."
-              actionLabel="Tüm favoriler"
-              actionHref="/favoriler"
-            />
-            {favoritesLoading ? (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {Array.from({ length: 3 }).map((_, idx) => (
-                  <Skeleton key={idx} className="h-72" />
-                ))}
-              </div>
-            ) : favorites && favorites.length > 0 ? (
-              <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                {favorites.slice(0, 6).map((listing) => (
-                  <ListingCard key={listing.id} listing={listing} initialFavorite />
-                ))}
-              </div>
-            ) : (
-              <div className="rounded-card border border-dashed border-border bg-surface-2/60 p-8 text-center text-sm text-text-muted">
-                {UI.emptyStates.favorites}
-              </div>
-            )}
-          </section>
-
-          {recentListings.length > 0 && (
-            <section className="mt-12 space-y-5">
-              <SectionHeader
-                title={UI.sections.recent}
-                description="Son baktığın ilanlara geri dön."
-              />
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-                {recentListings.map((item) => (
-                  <Link
-                    key={item.id}
-                    href={`/ilanlar/${item.id}`}
-                    className="group overflow-hidden rounded-card border border-border bg-surface shadow-card transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-hover"
-                  >
-                    <div className="aspect-[16/10] overflow-hidden bg-surface-2">
-                      <img
-                        src={item.photo}
-                        alt={item.title}
-                        className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-                      />
-                    </div>
-                    <div className="space-y-1 p-4">
-                      <div className="truncate text-sm font-semibold text-foreground">{item.title}</div>
-                      <div className="text-xs text-text-muted">
-                        {item.city} · {item.district}
-                      </div>
-                      <div className="text-sm font-bold text-foreground">
-                        ₺{Number(item.price).toLocaleString("tr-TR")}
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            </section>
           )}
-
-          <section className="mt-12">
-            <TrustBand />
-          </section>
-
-          <section className="mt-14 space-y-5">
-            <SectionHeader title="Tüm ilanlar" description={`${totalCount} ilan bulundu`} />
-            <div className="grid gap-6 lg:grid-cols-[280px_1fr]">
-              <aside className="hidden lg:block">
-                <div className="sticky top-[220px] rounded-card border border-border bg-surface p-5 shadow-card">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-sm font-semibold text-foreground">Filtreler</h3>
-                    <button
-                      type="button"
-                      onClick={handleClear}
-                      className="text-xs font-medium text-primary hover:underline"
-                    >
-                      Temizle
-                    </button>
-                  </div>
-                  <div className="mt-4">
-                    <FiltersPanel
-                      filters={filters}
-                      onChange={(next) => setFilters((prev) => ({ ...prev, ...next }))}
-                      onApply={handleApply}
-                      onClear={handleClear}
-                    />
-                  </div>
-                </div>
-              </aside>
-
-              <div>
-                {isLoading ? (
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                    {Array.from({ length: 6 }).map((_, idx) => (
-                      <Skeleton key={idx} className="h-72" />
-                    ))}
-                  </div>
-                ) : isError ? (
-                  <div className="flex items-center justify-between rounded-card border border-border bg-surface p-5 text-sm text-text-muted shadow-card">
-                    Liste yüklenemedi.
-                    <Button variant="outline" size="sm" onClick={() => refetch()}>
-                      Tekrar dene
-                    </Button>
-                  </div>
-                ) : listings && listings.length > 0 ? (
-                  <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
-                    {listings.map((listing) => (
-                      <ListingCard key={listing.id} listing={listing} />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="rounded-card border border-dashed border-border bg-surface-2/60 p-12 text-center text-sm text-text-muted">
-                    {UI.emptyStates.listings}
-                  </div>
-                )}
-              </div>
+          {!canBrowse ? (
+            <EmptyState
+              title="Üye girişi gerekli"
+              description="İlanları görmek için doğrulanmış hesabınla giriş yap."
+            />
+          ) : isLoading ? (
+            <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }, (_, i) => (
+                <Skeleton key={i} className="h-96" />
+              ))}
             </div>
-          </section>
-        </>
-      )}
+          ) : isError ? (
+            <div
+              role="alert"
+              className="card flex items-center justify-between p-6 text-sm"
+            >
+              İlanlar yüklenemedi.
+              <Button variant="outline" onClick={() => refetch()}>
+                Tekrar dene
+              </Button>
+            </div>
+          ) : listings?.length ? (
+            <div className="space-y-6"><div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              {listings.map((listing) => (
+                <ListingCard key={listing.id} listing={listing} />
+              ))}
+            </div><nav aria-label="İlan sayfaları" className="flex items-center justify-center gap-4">
+              <Button variant="outline" disabled={page === 0} onClick={() => setPage(page - 1)}>Önceki</Button>
+              <span className="text-sm text-text-muted">Sayfa {page + 1}</span>
+              <Button variant="outline" disabled={!data?.hasMore} onClick={() => setPage(page + 1)}>Sonraki</Button>
+            </nav></div>
+          ) : (
+            <div className="card p-10 text-center">
+              {page > 0 && <Button variant="outline" onClick={() => setPage(page - 1)}>Önceki sayfa</Button>}
+              <EmptyState
+                title={UI.emptyStates.listings}
+                description="Aramanı genişletmek için birkaç filtreyi kaldırabilirsin."
+              />
+              <Button variant="outline" className="mt-5" onClick={handleClear}>
+                Filtreleri temizle
+              </Button>
+            </div>
+          )}
+        </section>
+      </div>
     </div>
   );
 }

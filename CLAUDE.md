@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Monorepo Layout
 
-- `apps/web` — Next.js 14 App Router (TypeScript, Tailwind, React Query, shadcn-style UI)
+- `apps/web` — Next.js 15 App Router (TypeScript, Tailwind, React Query, shadcn-style UI)
 - `apps/mobile` — Flutter + Riverpod + go_router + Dio
 - `services/api` — FastAPI + SQLAlchemy 2 + Alembic (SQLite locally, Postgres in Docker)
 - `infra` — docker-compose (Postgres, Redis, MinIO, API, Nginx) + nginx.conf
@@ -17,9 +17,9 @@ Two supported modes — pick one, don't mix:
 
 **1. Full Docker (Postgres + Redis + MinIO + Nginx)** — `make dev` or `./infra/dev.sh`. API is reachable at `http://localhost:8080/api` (Nginx proxies it, so the `/api` prefix is required). Migrations + seed run automatically. MinIO is the object store; `/storage` is proxied through Nginx.
 
-**2. Docker-free (SQLite + in-memory Redis + local static storage)** — `services/api/scripts/dev_local.sh`. API runs directly on `http://127.0.0.1:8080` with **no `/api` prefix** (Nginx isn't in the loop). Storage is served by FastAPI at `/storage/...`. This mode also runs `alembic upgrade head` and `scripts/seed.py` before starting uvicorn.
+**2. Docker-free (SQLite + in-memory Redis + local static storage)** — `services/api/scripts/dev_local.sh`. API runs at `http://127.0.0.1:8080/api`. Only listing photos are served at `/storage/listings/...`; verification files require expiring API links. This mode also runs `alembic upgrade head` and `scripts/seed.py` before starting uvicorn.
 
-The `/api` prefix difference between the two modes is the most common footgun — the Flutter `API_BASE_URL` and web client base URL must match the mode you're running.
+Both modes use `/api`; Flutter and web base URLs must include that prefix.
 
 Combined one-shot for Flutter web + docker-free API: `./scripts/dev_mobile_web.sh` (API on 8080, Flutter web on 3005).
 
@@ -29,7 +29,7 @@ Combined one-shot for Flutter web + docker-free API: `./scripts/dev_mobile_web.s
 - `pnpm dev` — Next.js dev server (default port 3000)
 - `pnpm build` / `pnpm start`
 - `pnpm lint` — next lint (ESLint)
-- No test runner configured.
+- `npm run typecheck` and `npm run test:e2e` — TypeScript and Playwright checks.
 
 **API** (`services/api`):
 - `pytest` — run the test suite (`tests/` dir, see `pytest.ini`)
@@ -44,7 +44,7 @@ Combined one-shot for Flutter web + docker-free API: `./scripts/dev_mobile_web.s
 - `flutter pub get` → `flutter run`
 - `flutter run -d chrome --web-port=3005 --web-hostname=127.0.0.1` for web target
 - `flutter test`
-- Build-time override: `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080` (Android emulator uses `10.0.2.2` for host loopback)
+- Build-time override: `flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api` (Android emulator uses `10.0.2.2` for host loopback)
 
 ## API Architecture
 

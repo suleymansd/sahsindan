@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Heart } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 
@@ -8,18 +9,20 @@ import { SectionHeader } from "@/components/section-header";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageControls } from "@/components/page-controls";
 import { apiFetchWithAuth } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { UI } from "@/lib/strings";
 
 export default function FavoritesPage() {
+  const [page, setPage] = useState(0);
   const { accessToken } = useAuth();
 
   const { data, isLoading, isError, refetch } = useQuery({
-    queryKey: ["favorites"],
+    queryKey: ["favorites", page],
     queryFn: async () => {
       if (!accessToken) return [] as Listing[];
-      const res = await apiFetchWithAuth("/favorites", accessToken);
+      const res = await apiFetchWithAuth(`/favorites?limit=50&offset=${page * 50}`, accessToken);
       return res.data as Listing[];
     },
     enabled: Boolean(accessToken),
@@ -32,6 +35,7 @@ export default function FavoritesPage() {
         description={`Kaydettiğin ilanlar burada listelenir${data?.length ? ` · ${data.length} ilan` : ""}.`}
       />
 
+      {accessToken && !isLoading && <PageControls page={page} count={data?.length ?? 0} onChange={setPage} />}
       {!accessToken ? (
         <div className="mt-6 rounded-card border border-border bg-surface p-8 shadow-card">
           <EmptyState

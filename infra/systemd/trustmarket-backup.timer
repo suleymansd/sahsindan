@@ -1,0 +1,10 @@
+[Unit]
+Description=TrustMarket daily local snapshot
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+Unit=trustmarket-backup.service
+
+[Install]
+WantedBy=timers.target

@@ -2,12 +2,14 @@ import enum
 
 from sqlalchemy import (
     Boolean,
+    BigInteger,
     CheckConstraint,
     Column,
     DateTime,
     Enum,
     ForeignKey,
     Integer,
+    Index,
     Numeric,
     String,
     Text,
@@ -76,6 +78,8 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     phone = Column(String(32), unique=True, index=True, nullable=False)
     password_hash = Column(String(255), nullable=False)
+    mfa_secret = Column(Text, nullable=True)
+    mfa_last_counter = Column(BigInteger, nullable=False, default=-1, server_default="-1")
     role = Column(Enum(UserRole), nullable=False, default=UserRole.USER_PENDING)
     status = Column(Enum(UserStatus), nullable=False, default=UserStatus.ACTIVE)
     trust_score = Column(Integer, nullable=False, default=0)
@@ -102,6 +106,7 @@ class Profile(Base):
 
 class VerificationRequest(Base):
     __tablename__ = "verification_requests"
+    __table_args__ = (Index('ix_verification_user_created', 'user_id', 'created_at'),)
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -122,6 +127,7 @@ class VerificationAsset(Base):
     request_id = Column(Integer, ForeignKey("verification_requests.id"), nullable=False)
     type = Column(String(50), nullable=False)
     s3_key = Column(String(255), nullable=False)
+    size_bytes = Column(BigInteger, nullable=False, default=0, server_default="0")
     private_bool = Column(Boolean, default=True, nullable=False)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
@@ -130,6 +136,7 @@ class VerificationAsset(Base):
 
 class Listing(Base):
     __tablename__ = "listings"
+    __table_args__ = (CheckConstraint("price >= 0", name="ck_listing_price_positive"), Index('ix_listings_state_city_created', 'state', 'city', 'created_at', 'id'), Index('ix_listings_owner_created', 'owner_id', 'created_at'), Index('ix_listings_state_confirmed', 'state', 'last_confirmed_at'),)
 
     id = Column(Integer, primary_key=True)
     state = Column(Enum(ListingState), default=ListingState.DRAFT, nullable=False)
@@ -169,10 +176,12 @@ class CarDetail(Base):
 
 class ListingPhoto(Base):
     __tablename__ = "listing_photos"
+    __table_args__ = (Index('ix_listing_photos_listing_sort', 'listing_id', 'sort_order'),)
 
     id = Column(Integer, primary_key=True)
     listing_id = Column(Integer, ForeignKey("listings.id"), nullable=False)
     s3_key = Column(String(255), nullable=False)
+    size_bytes = Column(BigInteger, nullable=False, default=0, server_default="0")
     sort_order = Column(Integer, default=0, nullable=False)
     created_at = Column(DateTime, default=utc_now, nullable=False)
 
@@ -201,7 +210,7 @@ class Follow(Base):
 
 class Thread(Base):
     __tablename__ = "threads"
-    __table_args__ = (UniqueConstraint("listing_id", "buyer_id", name="uq_thread_listing_buyer"),)
+    __table_args__ = (UniqueConstraint("listing_id", "buyer_id", name="uq_thread_listing_buyer"), Index("ix_threads_buyer_updated_at", "buyer_id", "updated_at"), Index("ix_threads_seller_updated_at", "seller_id", "updated_at"),)
 
     id = Column(Integer, primary_key=True)
     listing_id = Column(Integer, ForeignKey("listings.id"), nullable=False)
@@ -216,6 +225,7 @@ class Thread(Base):
 
 class Message(Base):
     __tablename__ = "messages"
+    __table_args__ = (Index('ix_messages_thread_id_order', 'thread_id', 'id'), Index('ix_messages_thread_unread', 'thread_id', 'read_at', 'sender_id'),)
 
     id = Column(Integer, primary_key=True)
     thread_id = Column(Integer, ForeignKey("threads.id"), nullable=False)
@@ -227,6 +237,7 @@ class Message(Base):
 
 class Appointment(Base):
     __tablename__ = "appointments"
+    __table_args__ = (Index('ix_appointments_buyer_updated_at', 'buyer_id', 'updated_at'), Index('ix_appointments_seller_updated_at', 'seller_id', 'updated_at'),)
 
     id = Column(Integer, primary_key=True)
     listing_id = Column(Integer, ForeignKey("listings.id"), nullable=False)
@@ -296,6 +307,7 @@ class SystemSetting(Base):
 
 class RefreshToken(Base):
     __tablename__ = "refresh_tokens"
+    __table_args__ = (Index('ix_refresh_user_expiry', 'user_id', 'expires_at'),)
 
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -304,7 +316,7 @@ class RefreshToken(Base):
     revoked_at = Column(DateTime, nullable=True)
 
 
-# Constraints
-Listing.__table_args__ = (
-    CheckConstraint("price >= 0", name="ck_listing_price_positive"),
-)
+class StorageUsage(Base):
+    __tablename__ = "storage_usage"
+    id = Column(Integer, primary_key=True)
+    used_bytes = Column(BigInteger, nullable=False, default=0, server_default="0")

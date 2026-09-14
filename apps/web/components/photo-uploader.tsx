@@ -13,6 +13,7 @@ export type UploadItem = {
   preview: string;
   status: "pending" | "uploading" | "done" | "error";
   progress?: number;
+  photoId?: number;
   error?: string | null;
 };
 

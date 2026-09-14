@@ -10,12 +10,11 @@ import { apiFetch, API_URL } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
 import { toFriendlyError } from "@/lib/errors";
 
-const steps = ["Telefon", "Kimlik", "Selfie", "Meslek", "Onay"];
+const steps = ["Başvuru", "Kimlik", "Selfie", "Meslek", "Onay"];
 
 export default function VerificationPage() {
   const { accessToken } = useAuth();
   const [step, setStep] = useState(0);
-  const [otp, setOtp] = useState("123456");
   const [idFront, setIdFront] = useState<File | null>(null);
   const [idBack, setIdBack] = useState<File | null>(null);
   const [selfie, setSelfie] = useState<File | null>(null);
@@ -34,8 +33,6 @@ export default function VerificationPage() {
         method: "POST",
         headers: { Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({
-          phone_otp: otp,
-          selfie_passed: true,
           profession_proof: profession ? "uploaded" : null,
           background_consent: consent,
         }),
@@ -73,10 +70,10 @@ export default function VerificationPage() {
       <Card className="mx-auto max-w-2xl">
         <CardHeader>
           <div className="flex items-center justify-between">
-            <h1 className="font-display text-2xl font-semibold">Doğrulama Sihirbazı</h1>
+            <h1 className="font-display text-2xl font-semibold">Hesap doğrulama</h1>
             <Badge variant="warning">Kapalı Platform</Badge>
           </div>
-          <p className="text-sm text-muted-foreground">İlanları görmek için adımları tamamlayın.</p>
+          <p className="text-sm text-muted-foreground">İlan vermek ve mesajlaşmak için başvurunuzu incelemeye gönderin.</p>
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex flex-wrap gap-2">
@@ -89,40 +86,41 @@ export default function VerificationPage() {
 
           {step === 0 && (
             <div className="space-y-4">
-              <Input value={otp} onChange={(event) => setOtp(event.target.value)} placeholder="Telefon kodu" />
-              <p className="text-xs text-muted-foreground">Geliştirme OTP: 123456</p>
+              <div className="rounded-xl border border-border bg-surface-2 p-5 text-sm leading-relaxed text-text-muted">Başvurunuz yetkili bir ekip üyesi tarafından incelenir. Kimlik görselleri ve selfie yalnızca inceleme için yetkili kullanıcılara açılır. Otomatik SMS veya biyometrik doğrulama yapılmaz.</div>
             </div>
           )}
 
           {step === 1 && (
             <div className="space-y-4">
-              <Input type="file" onChange={(event) => setIdFront(event.target.files?.[0] || null)} />
-              <Input type="file" onChange={(event) => setIdBack(event.target.files?.[0] || null)} />
+              <Input type="file" accept="image/jpeg,image/png" onChange={(event) => setIdFront(event.target.files?.[0] || null)} />
+              <Input type="file" accept="image/jpeg,image/png" onChange={(event) => setIdBack(event.target.files?.[0] || null)} />
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4">
-              <Input type="file" onChange={(event) => setSelfie(event.target.files?.[0] || null)} />
-              <p className="text-xs text-muted-foreground">Selfie/liveness MVP için simüle edilir.</p>
+              <Input type="file" accept="image/jpeg,image/png" onChange={(event) => setSelfie(event.target.files?.[0] || null)} />
+              <p className="text-xs text-muted-foreground">Yüzünüzün açıkça göründüğü güncel bir fotoğraf seçin.</p>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-4">
-              <Input type="file" onChange={(event) => setProfession(event.target.files?.[0] || null)} />
+              <Input type="file" accept="image/jpeg,image/png" onChange={(event) => setProfession(event.target.files?.[0] || null)} />
               <p className="text-xs text-muted-foreground">Meslek belgesi veya e-Devlet çıktısı yükleyin.</p>
             </div>
           )}
 
           {step === 4 && (
             <label className="flex items-center gap-2 text-sm">
+              <span className="text-xs text-text-muted">Yalnızca JPEG/PNG. İncelenen belgeler saklama süresi dolunca otomatik silinir.</span>
               <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
-              Adli kontrol onayını kabul ediyorum (simülasyon).
+              Belgelerimin hesap doğrulaması için yetkili ekip tarafından incelenmesini kabul ediyorum.
             </label>
           )}
 
-          {status ? <div className="text-sm text-emerald-600">{status}</div> : null}
+          {status ? <div role="status" className="rounded-lg border border-border bg-surface-2 p-3 text-sm">{status}</div> : null}
+          {step === 4 && (!idFront || !selfie) && <p className="text-sm text-text-muted">Kimlik ön yüzü ve selfie eklemeniz gerekiyor.</p>}
 
           <div className="flex flex-wrap items-center justify-between gap-3">
             <Button variant="outline" disabled={step === 0} onClick={() => setStep(step - 1)}>
@@ -133,7 +131,7 @@ export default function VerificationPage() {
                 Devam Et
               </Button>
             ) : (
-              <Button onClick={handleSubmit} disabled={!consent || loading || Boolean(disabledReason)}>
+              <Button onClick={handleSubmit} disabled={!consent || !idFront || !selfie || loading || Boolean(disabledReason)}>
                 {loading ? "Gönderiliyor..." : "Doğrulamayı Gönder"}
               </Button>
             )}

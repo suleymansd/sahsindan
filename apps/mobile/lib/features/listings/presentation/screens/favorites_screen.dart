@@ -7,6 +7,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_loading.dart';
+import '../../../../shared/widgets/page_controls.dart';
 import '../../../../shared/widgets/verification_required_view.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../providers/listings_providers.dart';
@@ -34,6 +35,7 @@ class FavoritesScreen extends ConsumerWidget {
       );
     }
 
+    final offset = ref.watch(favoritesOffsetProvider);
     final asyncItems = ref.watch(favoritesProvider);
 
     return CupertinoPageScaffold(
@@ -52,6 +54,7 @@ class FavoritesScreen extends ConsumerWidget {
                   border: const Border(bottom: BorderSide(color: AppColors.separator)),
                   backgroundColor: AppColors.surface,
                 ),
+                SliverToBoxAdapter(child: PageControls(offset: offset, count: items.length, onChange: (value) => ref.read(favoritesOffsetProvider.notifier).state = value)),
                 if (items.isEmpty)
                   const SliverFillRemaining(
                     hasScrollBody: false,

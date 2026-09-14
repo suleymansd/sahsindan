@@ -5,6 +5,7 @@
 .env
 .env.*
 !.env.example
+!.env.production.example
 
 # Logs
 *.log
@@ -17,8 +18,11 @@ pnpm-debug.log*
 # Node / Next
 node_modules/
 .next/
+.next-e2e/
 out/
 coverage/
+test-results/
+playwright-report/
 
 # Flutter / Dart
 .dart_tool/
@@ -34,6 +38,7 @@ venv/
 __pycache__/
 *.pyc
 *.sqlite3
+.coverage
 
 # Service runtime artifacts
 services/api/storage/
@@ -51,3 +56,12 @@ services/api/.uvicorn.log
 # Misc
 *.swp
 *.swo
+
+# Private operational backups
+backups/
+
+# Operator identities and encrypted snapshots
+*.agekey
+*.agekey.pub
+*.tar.age
+*.tar.age.partial

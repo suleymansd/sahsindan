@@ -5,7 +5,7 @@ set -euo pipefail
 # - SQLite DB file
 # - In-memory "redis"
 # - Local /storage (served by FastAPI)
-# - Uvicorn on :8080 (no /api prefix). If you use Nginx (infra) it exposes it under /api.
+# - Uvicorn on :8080; API routes use /api in both direct and Nginx modes.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 API_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"

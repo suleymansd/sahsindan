@@ -10,5 +10,5 @@ router = APIRouter()
 
 
 @router.get("/trust")
-def get_trust_breakdown(user=Depends(require_verified), db: Session = Depends(get_db)):
+def get_trust_breakdown(user=Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     return success(trust_breakdown(db, user.id))

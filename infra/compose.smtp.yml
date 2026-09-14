@@ -1,0 +1,7 @@
+# Optional: enable only for an existing external SMTP account.
+# Usage: PRODUCTION_COMPOSE_OVERRIDE=infra/compose.smtp.yml scripts/production.sh deploy
+services:
+  api:
+    networks: [backend, smtp_egress]
+networks:
+  smtp_egress: {}

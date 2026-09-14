@@ -1,10 +1,19 @@
 "use client";
 
 import Link from "next/link";
-import { Heart, MapPin, Gauge, Calendar, Fuel, Cog, Timer } from "lucide-react";
-import { useMemo, useState, type MouseEvent } from "react";
+import {
+  Heart,
+  MapPin,
+  Gauge,
+  Calendar,
+  Fuel,
+  Cog,
+  ShieldCheck,
+} from "lucide-react";
+import { useEffect, useMemo, useState, type MouseEvent } from "react";
 
-import { ListingBadge, TrustBadge } from "@/components/badges";
+import { ListingBadge } from "@/components/badges";
+import { ListingImage } from "@/components/listing-image";
 import { useToast } from "@/components/toast";
 import { apiFetchWithAuth } from "@/lib/api";
 import { useAuth } from "@/lib/auth";
@@ -53,26 +62,31 @@ const FUEL_MAP: Record<string, string> = {
   LPG: "LPG",
 };
 
-export function ListingCard({ listing, initialFavorite = false }: ListingCardProps) {
+export function ListingCard({
+  listing,
+  initialFavorite = false,
+}: ListingCardProps) {
   const { accessToken } = useAuth();
   const { push } = useToast();
   const [favorited, setFavorited] = useState(initialFavorite);
   const [pending, setPending] = useState(false);
   const photo = listing.photos[0]?.url || "/placeholder.png";
+  useEffect(() => setFavorited(initialFavorite), [initialFavorite]);
 
   const transmission = useMemo(
     () =>
       listing.car_details
-        ? TRANSMISSION_MAP[listing.car_details.transmission] ?? listing.car_details.transmission
+        ? (TRANSMISSION_MAP[listing.car_details.transmission] ??
+          listing.car_details.transmission)
         : null,
-    [listing.car_details]
+    [listing.car_details],
   );
   const fuel = useMemo(
     () =>
       listing.car_details
-        ? FUEL_MAP[listing.car_details.fuel] ?? listing.car_details.fuel
+        ? (FUEL_MAP[listing.car_details.fuel] ?? listing.car_details.fuel)
         : null,
-    [listing.car_details]
+    [listing.car_details],
   );
 
   async function toggleFavorite(event: MouseEvent<HTMLButtonElement>) {
@@ -85,107 +99,127 @@ export function ListingCard({ listing, initialFavorite = false }: ListingCardPro
     setPending(true);
     try {
       if (favorited) {
-        await apiFetchWithAuth(`/listings/${listing.id}/favorite`, accessToken, { method: "DELETE" });
+        await apiFetchWithAuth(
+          `/listings/${listing.id}/favorite`,
+          accessToken,
+          { method: "DELETE" },
+        );
         setFavorited(false);
         push({ title: strings.listings.removedFromFavorites });
       } else {
-        await apiFetchWithAuth(`/listings/${listing.id}/favorite`, accessToken, { method: "POST" });
+        await apiFetchWithAuth(
+          `/listings/${listing.id}/favorite`,
+          accessToken,
+          { method: "POST" },
+        );
         setFavorited(true);
         push({ title: strings.listings.addedToFavorites });
       }
     } catch {
-      push({ title: strings.common.error, description: strings.common.tryAgain });
+      push({
+        title: strings.common.error,
+        description: strings.common.tryAgain,
+      });
     } finally {
       setPending(false);
     }
   }
 
   return (
-    <Link
-      href={`/ilanlar/${listing.id}`}
-      className="group relative block overflow-hidden rounded-card border border-border/80 bg-surface/88 shadow-card backdrop-blur-md transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-hover"
-    >
-      <div className="relative aspect-[4/3] overflow-hidden bg-surface-2">
-        <img
-          src={photo}
-          alt={listing.title}
-          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.03]"
-          loading="lazy"
-        />
-
-        <div className="absolute left-3 top-3 flex flex-wrap gap-1.5">
-          <ListingBadge state={listing.state} staleState={listing.stale_state} />
-          <TrustBadge score={listing.owner.trust_score} />
-        </div>
-
-        <button
-          type="button"
-          onClick={toggleFavorite}
-          disabled={pending}
-          aria-label={favorited ? strings.listings.removeFromFavorites : strings.listings.addToFavorites}
-          className={cn(
-            "absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full border border-border/70 bg-surface/92 shadow-medium backdrop-blur transition-all",
-            "hover:scale-105 active:scale-95 disabled:opacity-60"
-          )}
-        >
-          <Heart
-            className={cn(
-              "h-[18px] w-[18px] transition-colors",
-              favorited ? "fill-danger text-danger" : "text-text-muted"
-            )}
+    <article className="group relative overflow-hidden rounded-card border border-border bg-surface transition-all duration-200 hover:border-info/50 hover:shadow-card-hover">
+      <Link href={`/ilanlar/${listing.id}`} className="block">
+        <div className="relative aspect-[16/11] overflow-hidden bg-surface-2">
+          <ListingImage
+            src={photo}
+            alt={listing.title}
+            className="transition-transform duration-500 group-hover:scale-[1.025]"
           />
-        </button>
-      </div>
-
-      <div className="space-y-3 p-4">
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="truncate text-title-sm font-semibold text-foreground">{listing.title}</h3>
-            {listing.car_details && (
-              <p className="mt-0.5 truncate text-xs text-text-muted">
-                {listing.car_details.brand} {listing.car_details.model}
-              </p>
-            )}
+          <div className="absolute left-3 top-3">
+            <ListingBadge
+              state={listing.state}
+              staleState={listing.stale_state}
+            />
           </div>
-          <div className="text-right font-display text-lg font-bold text-foreground">
-            ₺{listing.price.toLocaleString("tr-TR")}
+          <div className="absolute bottom-3 left-3 flex items-center gap-2 rounded-lg bg-surface/95 px-2.5 py-2 backdrop-blur-sm">
+            <ShieldCheck
+              className={cn(
+                "h-4 w-4",
+                listing.owner.trust_score >= 80
+                  ? "text-accent"
+                  : "text-text-muted",
+              )}
+            />
+            <div>
+              <div className="text-[8px] font-semibold uppercase tracking-wider text-text-muted">
+                Satıcı güven puanı
+              </div>
+              <div className="mt-0.5 text-xs font-bold text-foreground">
+                {listing.owner.trust_score}
+                <span className="font-normal text-text-muted"> / 100</span>
+              </div>
+            </div>
           </div>
         </div>
-
-        {listing.car_details && (
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-text-muted">
-            <span className="inline-flex items-center gap-1">
-              <Calendar className="h-3.5 w-3.5" />
-              {listing.car_details.year}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Gauge className="h-3.5 w-3.5" />
-              {listing.car_details.mileage.toLocaleString("tr-TR")} km
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Cog className="h-3.5 w-3.5" />
-              {transmission}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Fuel className="h-3.5 w-3.5" />
-              {fuel}
-            </span>
+        <div className="p-4 sm:p-5">
+          <div className="mb-2 flex items-center gap-1 text-[11px] text-text-muted">
+            <MapPin className="h-3 w-3" />
+            {listing.district} ·{" "}
+            {listing.city === "ISTANBUL" ? "İstanbul" : listing.city}
           </div>
-        )}
-
-        <div className="flex items-center justify-between border-t border-border/70 pt-3 text-xs">
-          <span className="inline-flex items-center gap-1 text-text-muted">
-            <MapPin className="h-3.5 w-3.5 text-primary" />
-            <span className="font-medium text-foreground">{listing.city}</span>
-            <span>·</span>
-            <span>{listing.district}</span>
-          </span>
-          <span className="inline-flex items-center gap-1 text-text-muted">
-            <Timer className="h-3.5 w-3.5 text-accent" />
-            {listing.owner.response_time_bucket || strings.listings.calculatingResponseTime}
-          </span>
+          <h3 className="line-clamp-2 min-h-[2.75rem] text-sm font-semibold leading-[1.375rem] text-foreground">
+            {listing.title}
+          </h3>
+          {listing.car_details && (
+            <div className="mt-3 grid grid-cols-2 gap-x-2 gap-y-2 text-[11px] text-text-muted">
+              <span className="inline-flex items-center gap-1.5">
+                <Calendar className="h-3.5 w-3.5" />
+                {listing.car_details.year}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Gauge className="h-3.5 w-3.5" />
+                {listing.car_details.mileage.toLocaleString("tr-TR")} km
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Cog className="h-3.5 w-3.5" />
+                {transmission}
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <Fuel className="h-3.5 w-3.5" />
+                {fuel}
+              </span>
+            </div>
+          )}
+          <div className="mt-4 flex items-end justify-between border-t border-border pt-4">
+            <div>
+              <div className="text-[10px] text-text-muted">İlan fiyatı</div>
+              <div className="mt-0.5 font-display text-lg font-semibold tracking-tight">
+                {listing.price.toLocaleString("tr-TR")}{" "}
+                <span className="text-xs font-normal">TL</span>
+              </div>
+            </div>
+            <span className="text-xs text-text-muted">İncele ↗</span>
+          </div>
         </div>
-      </div>
-    </Link>
+      </Link>
+      <button
+        type="button"
+        onClick={toggleFavorite}
+        disabled={pending}
+        aria-pressed={favorited}
+        aria-label={
+          favorited
+            ? strings.listings.removeFromFavorites
+            : strings.listings.addToFavorites
+        }
+        className="absolute right-3 top-3 inline-flex h-9 w-9 items-center justify-center rounded-full bg-surface/95 text-foreground transition-colors hover:bg-surface disabled:opacity-60"
+      >
+        <Heart
+          className={cn(
+            "h-4 w-4",
+            favorited ? "fill-danger text-danger" : "text-text-muted",
+          )}
+        />
+      </button>
+    </article>
   );
 }

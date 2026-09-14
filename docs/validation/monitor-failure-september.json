@@ -1,0 +1,1 @@
+{"time": "2026-09-14T22:09:17.962215+00:00", "ok": false, "checks": {"https_ready": false, "disk": false, "containers": false, "backup_recent": true}, "free_gib": 0.31}

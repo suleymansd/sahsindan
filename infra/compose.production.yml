@@ -1,0 +1,164 @@
+name: trustmarket-production
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: trustmarket
+      POSTGRES_USER: trustmarket
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set a unique database password}
+    command: ["postgres", "-c", "max_connections=60", "-c", "shared_buffers=128MB", "-c", "statement_timeout=15000", "-c", "idle_in_transaction_session_timeout=30000"]
+    volumes: ["database:/var/lib/postgresql/data"]
+    networks: [backend]
+    mem_limit: 768m
+    cpus: 1.0
+    logging: *logging
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U trustmarket"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7.4.11-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes", "--appendfsync", "always", "--maxmemory", "128mb", "--maxmemory-policy", "noeviction"]
+    volumes: ["redis:/data"]
+    networks: [backend]
+    mem_limit: 192m
+    cpus: 0.5
+    logging: *logging
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+
+  migrate:
+    build: ../services/api
+    command: ["sh", "-c", "alembic upgrade head && python scripts/maintenance.py --reconcile-once"]
+    volumes: ["uploads:/app/storage"]
+    environment: &api-env
+      APP_ENV: production
+      DATABASE_URL: postgresql+psycopg://trustmarket:${POSTGRES_PASSWORD}@postgres:5432/trustmarket
+      REDIS_URL: redis://redis:6379/0
+      JWT_SECRET: ${JWT_SECRET:?Set a random access secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?Set a different refresh secret}
+      MFA_ENCRYPTION_KEY: ${MFA_ENCRYPTION_KEY:?Set a Fernet key for MFA secrets}
+      VERIFICATION_RETENTION_DAYS: ${VERIFICATION_RETENTION_DAYS:-30}
+      PUBLIC_API_URL: https://${DOMAIN:?Set your domain}
+      PUBLIC_WEB_URL: https://${DOMAIN}
+      FALLBACK_IMAGE_URL: https://${DOMAIN}/placeholder.png
+      CORS_ORIGINS: https://${DOMAIN}
+      DISABLE_STORAGE: "true"
+      DISABLE_STALE_JOB: "true"
+      VERIFICATION_MODE: manual
+      SQLALCHEMY_POOL_SIZE: "5"
+      SQLALCHEMY_MAX_OVERFLOW: "5"
+      SQLALCHEMY_POOL_TIMEOUT: "5"
+      API_DAILY_REQUEST_LIMIT: ${API_DAILY_REQUEST_LIMIT:-100000}
+      API_DAILY_RESPONSE_BYTES: ${API_DAILY_RESPONSE_BYTES:-1073741824}
+      STORAGE_BUDGET_BYTES: ${STORAGE_BUDGET_BYTES:-5368709120}
+      SMTP_DAILY_MESSAGE_LIMIT: ${SMTP_DAILY_MESSAGE_LIMIT:-100}
+      API_IP_REQUESTS_PER_MINUTE: "1200"
+      API_USER_REQUESTS_PER_MINUTE: "180"
+      UPLOAD_USER_DAILY_BYTES: "52428800"
+      UPLOAD_GLOBAL_DAILY_BYTES: "524288000"
+      MAX_ACTIVE_LISTINGS_PER_USER: "20"
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_SENDER: ${SMTP_SENDER:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+    networks: [backend]
+    depends_on:
+      postgres: {condition: service_healthy}
+
+  api:
+    build: ../services/api
+    restart: unless-stopped
+    environment: *api-env
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2", "--limit-concurrency", "100", "--backlog", "256", "--timeout-keep-alive", "5", "--ws-max-size", "2048", "--proxy-headers", "--forwarded-allow-ips", "*", "--no-access-log"]
+    volumes: ["uploads:/app/storage"]
+    networks: [backend]
+    mem_limit: 768m
+    cpus: 1.5
+    pids_limit: 128
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    logging: *logging
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+      redis: {condition: service_healthy}
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8000/ready"]
+      interval: 15s
+      timeout: 5s
+      retries: 4
+
+  maintenance:
+    build: ../services/api
+    restart: unless-stopped
+    environment: *api-env
+    command: ["python", "scripts/maintenance.py"]
+    volumes: ["uploads:/app/storage"]
+    networks: [backend]
+    mem_limit: 192m
+    cpus: 0.25
+    healthcheck:
+      test: ["CMD", "python", "-c", "import pathlib,time; p=pathlib.Path('/app/storage/.maintenance-heartbeat'); assert p.exists() and time.time()-p.stat().st_mtime < 180"]
+      interval: 60s
+      timeout: 5s
+      start_period: 90s
+      retries: 3
+    logging: *logging
+    depends_on:
+      migrate: {condition: service_completed_successfully}
+
+  web:
+    build: ../apps/web
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/giris/kullanici').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3
+    networks: [backend]
+    mem_limit: 384m
+    cpus: 1.0
+    pids_limit: 64
+    security_opt: ["no-new-privileges:true"]
+    cap_drop: [ALL]
+    logging: *logging
+
+  edge:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      DOMAIN: ${DOMAIN}
+      ACME_EMAIL: ${ACME_EMAIL:?Set a certificate contact email}
+    ports: ["80:80", "443:443", "443:443/udp"]
+    volumes: ["./Caddyfile:/etc/caddy/Caddyfile:ro", "certificates:/data", "caddy_config:/config"]
+    networks: [backend, public]
+    mem_limit: 192m
+    cpus: 0.5
+    logging: *logging
+    depends_on: [api, web]
+
+networks:
+  backend: {internal: true}
+  public: {}
+volumes:
+  database:
+  redis:
+  uploads:
+  certificates:
+  caddy_config:

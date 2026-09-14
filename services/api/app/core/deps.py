@@ -1,16 +1,20 @@
 from typing import Callable
+import hashlib
+import hmac
 
 from fastapi import Depends, Header, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.response import error
 from app.core.security import decode_access_token
+from app.core.mfa import session_mfa_valid
+from app.core.config import settings
+from app.core.rate_limit import consume_limit
 from app.db.session import get_db
 from app.db.models import User, UserRole, UserStatus
 
 
 def get_current_user(
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
     authorization: str | None = Header(default=None),
 ) -> User:
     if not authorization or not authorization.startswith("Bearer "):
@@ -23,8 +27,21 @@ def get_current_user(
     user = db.query(User).filter(User.id == int(payload["sub"])).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    if not session_mfa_valid(user, payload):
+        raise HTTPException(status_code=401, detail="Session expired; MFA login required")
+    version = payload.get("pv")
+    if (settings.app_env == "production" and not version) or (version and not hmac.compare_digest(str(version), hashlib.sha256(user.password_hash.encode()).hexdigest())):
+        raise HTTPException(status_code=401, detail="Session expired")
+    if user.role == UserRole.BANNED:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account banned")
     if user.status == UserStatus.SUSPENDED:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account suspended")
+    if settings.app_env == "production":
+        consume_limit(f"user:requests:{user.id}", settings.api_user_requests_per_minute, 60)
+    # Release authentication's connection before the endpoint needs a worker thread.
+    # Only loaded scalar identity fields cross this boundary; routes query db anew.
+    db.expunge(user)
+    db.rollback()
     return user
 
 

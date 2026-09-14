@@ -350,7 +350,7 @@ export default function UserDetailPage() {
             )}
             <div className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning-bg px-3 py-1 text-xs text-warning">
               <ShieldBan className="h-3.5 w-3.5" />
-              Kritik aksiyonlar audit log'a yazılır
+              Kritik aksiyonlar audit log&apos;a yazılır
             </div>
           </div>
         </CardContent>

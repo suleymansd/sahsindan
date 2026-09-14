@@ -1,0 +1,10 @@
+{
+  "restored_redis_keys": 8,
+  "redis_restore": "passed",
+  "database_restore": "passed",
+  "referenced_files_checked": 10,
+  "upload_files_checked": 11,
+  "encryption": "age authenticated",
+  "live_data_changed": false,
+  "tampered_backup_rejected": true
+}

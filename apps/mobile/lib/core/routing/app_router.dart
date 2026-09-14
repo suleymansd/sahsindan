@@ -22,6 +22,8 @@ import '../../features/messaging/presentation/screens/threads_screen.dart';
 import '../../features/messaging/presentation/screens/thread_detail_screen.dart';
 import '../../features/appointments/presentation/screens/appointments_screen.dart';
 import '../../features/profile/presentation/screens/profile_screen.dart';
+import '../../features/listings/presentation/screens/marketplace_home_screen.dart';
+import '../../features/listings/presentation/screens/listing_comparison_screen.dart';
 import 'main_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
@@ -29,16 +31,23 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     initialLocation: '/splash',
-    refreshListenable: GoRouterRefreshStream(ref.watch(_routerRefreshProvider).stream),
+    refreshListenable:
+        GoRouterRefreshStream(ref.watch(_routerRefreshProvider).stream),
     routes: [
-      GoRoute(path: '/splash', builder: (context, state) => const SplashScreen()),
+      GoRoute(
+          path: '/splash', builder: (context, state) => const SplashScreen()),
       GoRoute(path: '/', builder: (context, state) => const LandingScreen()),
       GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
-      GoRoute(path: '/register', builder: (context, state) => const RegisterScreen()),
-      GoRoute(path: '/forgot', builder: (context, state) => const ForgotPasswordScreen()),
+      GoRoute(
+          path: '/register',
+          builder: (context, state) => const RegisterScreen()),
+      GoRoute(
+          path: '/forgot',
+          builder: (context, state) => const ForgotPasswordScreen()),
       GoRoute(
         path: '/reset',
-        builder: (context, state) => ResetPasswordScreen(resetToken: state.uri.queryParameters['token']),
+        builder: (context, state) =>
+            ResetPasswordScreen(resetToken: state.uri.queryParameters['token']),
       ),
       // Preferred verification routes
       GoRoute(
@@ -48,12 +57,19 @@ final routerProvider = Provider<GoRouter>((ref) {
           next: state.uri.queryParameters['next'],
         ),
       ),
-      GoRoute(path: '/verification/verify', builder: (context, state) => const VerificationWizardScreen()),
+      GoRoute(
+          path: '/verification/verify',
+          builder: (context, state) => const VerificationWizardScreen()),
       // Backwards-compatible aliases
-      GoRoute(path: '/pending/status', redirect: (_, state) => '/verification/status${state.uri.hasQuery ? '?${state.uri.query}' : ''}'),
-      GoRoute(path: '/pending/verify', redirect: (_, __) => '/verification/verify'),
+      GoRoute(
+          path: '/pending/status',
+          redirect: (_, state) =>
+              '/verification/status${state.uri.hasQuery ? '?${state.uri.query}' : ''}'),
+      GoRoute(
+          path: '/pending/verify', redirect: (_, __) => '/verification/verify'),
       StatefulShellRoute.indexedStack(
-        builder: (context, state, navShell) => MainShell(navigationShell: navShell),
+        builder: (context, state, navShell) =>
+            MainShell(navigationShell: navShell),
         branches: [
           StatefulShellBranch(
             routes: [
@@ -74,12 +90,19 @@ final routerProvider = Provider<GoRouter>((ref) {
                     builder: (context, state) => const MyListingsScreen(),
                   ),
                   GoRoute(
+                      path: 'compare',
+                      builder: (context, state) =>
+                          const ListingComparisonScreen()),
+                  GoRoute(
                     path: ':id',
-                    builder: (context, state) => ListingDetailScreen(id: int.parse(state.pathParameters['id']!)),
+                    builder: (context, state) => ListingDetailScreen(
+                        id: int.parse(state.pathParameters['id']!)),
                     routes: [
                       GoRoute(
                         path: 'edit',
-                        builder: (context, state) => ListingEditorScreen(editListingId: int.parse(state.pathParameters['id']!)),
+                        builder: (context, state) => ListingEditorScreen(
+                            editListingId:
+                                int.parse(state.pathParameters['id']!)),
                       ),
                     ],
                   ),
@@ -95,7 +118,8 @@ final routerProvider = Provider<GoRouter>((ref) {
                 routes: [
                   GoRoute(
                     path: ':id',
-                    builder: (context, state) => ThreadDetailScreen(threadId: int.parse(state.pathParameters['id']!)),
+                    builder: (context, state) => ThreadDetailScreen(
+                        threadId: int.parse(state.pathParameters['id']!)),
                   ),
                 ],
               ),
@@ -103,14 +127,23 @@ final routerProvider = Provider<GoRouter>((ref) {
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/app/appointments', builder: (context, state) => const AppointmentsScreen()),
+              GoRoute(
+                  path: '/app/appointments',
+                  builder: (context, state) => const AppointmentsScreen()),
             ],
           ),
           StatefulShellBranch(
             routes: [
-              GoRoute(path: '/app/profile', builder: (context, state) => const ProfileScreen()),
+              GoRoute(
+                  path: '/app/profile',
+                  builder: (context, state) => const ProfileScreen()),
             ],
           ),
+          StatefulShellBranch(routes: [
+            GoRoute(
+                path: '/app/home',
+                builder: (context, state) => const MarketplaceHomeScreen())
+          ]),
         ],
       ),
     ],
@@ -125,8 +158,13 @@ final routerProvider = Provider<GoRouter>((ref) {
         return _homeFor(auth.stage);
       }
 
-      final isPublic = loc == '/' || loc == '/login' || loc == '/register' || loc == '/forgot' || loc.startsWith('/reset');
-      final isVerification = loc.startsWith('/verification/') || loc.startsWith('/pending/');
+      final isPublic = loc == '/' ||
+          loc == '/login' ||
+          loc == '/register' ||
+          loc == '/forgot' ||
+          loc.startsWith('/reset');
+      final isVerification =
+          loc.startsWith('/verification/') || loc.startsWith('/pending/');
       final isApp = loc.startsWith('/app/');
 
       if (auth.stage == AuthStage.unauthenticated) {
@@ -140,7 +178,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       // Authenticated (verified or not)
       if (isPublic) {
-        return '/app/listings';
+        return '/app/home';
       }
 
       // Route-level gating for actions that must be verified (deep-link safety).
@@ -149,11 +187,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           'message': 'Bu islem icin hesabini dogrulaman gerekiyor.',
           'next': loc,
         };
-        return Uri(path: '/verification/status', queryParameters: qp).toString();
+        return Uri(path: '/verification/status', queryParameters: qp)
+            .toString();
       }
 
       if (isVerification) return null;
-      return isApp ? null : '/app/listings';
+      return isApp ? null : '/app/home';
     },
   );
 });
@@ -165,7 +204,7 @@ String _homeFor(AuthStage stage) {
     case AuthStage.banned:
       return '/';
     case AuthStage.authenticated:
-      return '/app/listings';
+      return '/app/home';
     case AuthStage.bootstrapping:
       return '/splash';
   }

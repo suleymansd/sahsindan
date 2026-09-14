@@ -7,21 +7,26 @@ import { CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { apiFetch } from "@/lib/api";
+import { toFriendlyError } from "@/lib/errors";
 
 export default function ForgotPage() {
   const [result, setResult] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setLoading(true);
+    setError(null);
+    try {
     const formData = new FormData(event.currentTarget);
     const res = await apiFetch("/auth/forgot-password", {
       method: "POST",
       body: JSON.stringify({ email: formData.get("email") }),
     });
     setResult(res.data.reset_token || "Eğer hesap varsa sıfırlama bağlantısı gönderildi.");
-    setLoading(false);
+    } catch (cause) { setError(toFriendlyError(cause)); }
+    finally { setLoading(false); }
   }
 
   return (
@@ -37,7 +42,7 @@ export default function ForgotPage() {
           E-postanı gir, sıfırlama bağlantısını gönderelim.
         </p>
 
-        <form className="mt-7 space-y-4" onSubmit={handleSubmit} noValidate>
+        <form className="mt-7 space-y-4" onSubmit={handleSubmit}>
           <div className="space-y-1.5">
             <label htmlFor="email" className="text-sm font-medium text-foreground">
               E-posta
@@ -70,6 +75,7 @@ export default function ForgotPage() {
           </div>
         )}
 
+        {error && <p role="alert" className="mt-4 rounded-lg border border-danger/30 bg-danger/5 p-3 text-sm text-danger">{error}</p>}
         <div className="mt-6 border-t border-border pt-5 text-center text-sm">
           <Link href="/giris" className="font-semibold text-primary hover:underline">
             ← Giriş panellerine dön

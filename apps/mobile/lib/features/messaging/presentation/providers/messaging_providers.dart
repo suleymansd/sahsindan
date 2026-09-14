@@ -12,6 +12,8 @@ final threadsProvider = FutureProvider<List<Thread>>((ref) async {
   return ref.watch(messagingRepositoryProvider).listThreads();
 });
 
-final threadProvider = FutureProvider.family<Thread, int>((ref, id) async {
-  return ref.watch(messagingRepositoryProvider).getThread(id);
+final threadBeforeProvider = StateProvider.autoDispose.family<int?, int>((ref, id) => null);
+
+final threadProvider = FutureProvider.autoDispose.family<Thread, int>((ref, id) async {
+  return ref.watch(messagingRepositoryProvider).getThread(id, beforeId: ref.watch(threadBeforeProvider(id)));
 });

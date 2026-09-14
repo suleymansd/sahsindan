@@ -20,12 +20,14 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _otp = TextEditingController();
   bool _loading = false;
 
   @override
   void dispose() {
     _email.dispose();
     _password.dispose();
+    _otp.dispose();
     super.dispose();
   }
 
@@ -33,13 +35,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
     try {
-      await ref.read(authControllerProvider.notifier).login(_email.text.trim(), _password.text);
+      await ref.read(authControllerProvider.notifier).login(_email.text.trim(), _password.text, otpCode: _otp.text.trim());
       if (mounted) context.go('/app/listings');
     } catch (e) {
       final err = ErrorMapper.fromDio(e);
       final msg = err.when(
         network: (m) => m,
-        unauthorized: () => 'E-posta veya sifre hatali.',
+        unauthorized: () => 'E-posta, şifre veya doğrulama kodunu kontrol edin.',
         forbidden: (m) => m ?? 'Erisim engellendi.',
         rateLimited: (m) => m ?? 'Cok fazla deneme. Biraz bekleyin.',
         validation: (m, _) => m ?? 'Gecersiz veri',
@@ -127,6 +129,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
+                    ExpansionTile(
+                      title: const Text('İki adımlı doğrulama'),
+                      subtitle: const Text('Yönetici veya moderatör hesabınız için'),
+                      children: [
+                        TextFormField(
+                          controller: _otp,
+                          keyboardType: TextInputType.number,
+                          autofillHints: const [AutofillHints.oneTimeCode],
+                          maxLength: 6,
+                          decoration: const InputDecoration(labelText: 'Doğrulayıcı uygulama kodu'),
+                          validator: (value) => value != null && value.isNotEmpty && !RegExp(r'^[0-9]{6}$').hasMatch(value)
+                              ? '6 haneli kod girin' : null,
+                        ),
+                      ],
+                    ),
                     FilledButton(
                       onPressed: _loading ? null : _submit,
                       child: SizedBox(

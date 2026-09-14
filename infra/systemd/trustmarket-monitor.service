@@ -1,0 +1,14 @@
+[Unit]
+Description=TrustMarket readiness, disk and backup checks
+After=docker.service network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/trustmarket
+EnvironmentFile=/opt/trustmarket/infra/.env.operations
+ExecStart=/usr/bin/python3 /opt/trustmarket/scripts/monitor.py --url ${MONITOR_URL}
+TimeoutStartSec=45
+NoNewPrivileges=true
+PrivateTmp=true
+StandardOutput=journal
+StandardError=journal

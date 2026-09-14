@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from app.core.deps import require_role
 from app.core.response import success
+from app.core.config import settings
 from app.db.models import (
     AuditLog,
     Listing,
@@ -58,7 +59,7 @@ def _paginate(query, page: int, page_size: int):
 
 
 @router.get("/dashboard")
-def dashboard(user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])), db: Session = Depends(get_db)):
+def dashboard(user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])), db: Session = Depends(get_db, scope="function")):
     now = utc_now()
     pending_verifications = (
         db.query(VerificationRequest).filter(VerificationRequest.status == VerificationStatus.PENDING).count()
@@ -111,7 +112,7 @@ def verification_queue(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=5, le=100),
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     start_dt = _parse_date(start)
     end_dt = _parse_date(end)
@@ -164,7 +165,7 @@ def verification_queue(
 def get_verification(
     request_id: int,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     req = (
         db.query(VerificationRequest)
@@ -225,7 +226,7 @@ def get_verification_asset_url(
     request_id: int,
     asset_id: int,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     asset = (
         db.query(VerificationAsset)
@@ -242,24 +243,37 @@ def approve_verification(
     request_id: int,
     payload: AdminVerificationDecision,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
-    req = db.query(VerificationRequest).filter(VerificationRequest.id == request_id).first()
+    req = db.query(VerificationRequest).filter(VerificationRequest.id == request_id).with_for_update().first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    if req.status != VerificationStatus.PENDING:
+        raise HTTPException(status_code=409, detail="Request is already reviewed")
+    target = db.query(User).filter(User.id == req.user_id).populate_existing().with_for_update(key_share=True).first()
+    if not target or target.role == UserRole.BANNED or target.status == UserStatus.SUSPENDED:
+        raise HTTPException(status_code=409, detail="Account cannot be verified")
+    if settings.app_env == "production":
+        asset_types = {asset.type for asset in req.assets}
+        if not ({"id_front", "selfie"} <= asset_types or {"identity", "selfie"} <= asset_types):
+            raise HTTPException(status_code=409, detail="Identity and selfie documents are required for review")
     req.status = VerificationStatus.APPROVED
     req.reviewer_id = user.id
     req.reason = payload.reason
     req.reason_code = payload.reason_code
     db.add(req)
 
-    target = db.query(User).filter(User.id == req.user_id).first()
     if target:
-        target.role = UserRole.USER_VERIFIED
+        if target.role == UserRole.USER_PENDING:
+            target.role = UserRole.USER_VERIFIED
+        if target.profile and any(asset.type == "profession" for asset in req.assets):
+            target.profile.profession_verified = True
         db.add(target)
-        db.commit()
+        db.flush()
         recalculate_trust_score(db, target.id)
     log_audit(db, user.id, "VERIFICATION_APPROVED", "user", req.user_id, {"request_id": req.id})
+    db.commit()
+    invalidate_listings_cache()
     return success({"status": "approved"})
 
 
@@ -268,21 +282,24 @@ def reject_verification(
     request_id: int,
     payload: AdminVerificationDecision,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     if not payload.reason:
         raise HTTPException(status_code=400, detail="Reason required")
-    req = db.query(VerificationRequest).filter(VerificationRequest.id == request_id).first()
+    req = db.query(VerificationRequest).filter(VerificationRequest.id == request_id).with_for_update().first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    if req.status != VerificationStatus.PENDING:
+        raise HTTPException(status_code=409, detail="Request is already reviewed")
     req.status = VerificationStatus.REJECTED
     req.reviewer_id = user.id
     req.reason = payload.reason
     req.reason_code = payload.reason_code
     db.add(req)
-    db.commit()
+    db.flush()
 
     log_audit(db, user.id, "VERIFICATION_REJECTED", "user", req.user_id, {"request_id": req.id})
+    db.commit()
     return success({"status": "rejected"})
 
 
@@ -291,19 +308,22 @@ def request_more_info(
     request_id: int,
     payload: AdminVerificationMoreInfo,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
-    req = db.query(VerificationRequest).filter(VerificationRequest.id == request_id).first()
+    req = db.query(VerificationRequest).filter(VerificationRequest.id == request_id).with_for_update().first()
     if not req:
         raise HTTPException(status_code=404, detail="Request not found")
+    if req.status != VerificationStatus.PENDING:
+        raise HTTPException(status_code=409, detail="Request is already reviewed")
     req.status = VerificationStatus.PENDING
     req.reason = payload.note
     req.reason_code = "MORE_INFO"
     req.reviewer_id = user.id
     db.add(req)
-    db.commit()
+    db.flush()
 
     log_audit(db, user.id, "VERIFICATION_MORE_INFO", "user", req.user_id, {"request_id": req.id})
+    db.commit()
     return success({"status": "more_info_requested"})
 
 
@@ -316,7 +336,7 @@ def list_users(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=5, le=100),
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     base = db.query(User).outerjoin(Profile, Profile.user_id == User.id)
     if query:
@@ -366,7 +386,7 @@ def list_users(
 def get_user(
     user_id: int,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
@@ -435,7 +455,7 @@ def ban_user(
     user_id: int,
     payload: AdminUserBan,
     user: User = Depends(require_role([UserRole.ADMIN])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
@@ -444,7 +464,7 @@ def ban_user(
     target.role = UserRole.BANNED
     target.status = UserStatus.SUSPENDED
     db.add(target)
-    db.commit()
+    recalculate_trust_score(db, target.id)
     log_audit(
         db,
         user.id,
@@ -453,6 +473,8 @@ def ban_user(
         user_id,
         {"reason": payload.reason, "previous_role": previous_role},
     )
+    db.commit()
+    invalidate_listings_cache()
     return success({"status": "banned"})
 
 
@@ -461,7 +483,7 @@ def unban_user(
     user_id: int,
     payload: AdminUserRoleUpdate | None = Body(default=None),
     user: User = Depends(require_role([UserRole.ADMIN])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
@@ -474,9 +496,13 @@ def unban_user(
             raise HTTPException(status_code=400, detail="Invalid role") from exc
     else:
         target.role = UserRole.USER_PENDING
+    if target.role == UserRole.BANNED:
+        raise HTTPException(status_code=400, detail="Cannot unban with BANNED role")
     db.add(target)
-    db.commit()
+    recalculate_trust_score(db, target.id)
     log_audit(db, user.id, "USER_UNBANNED", "user", user_id, {"role": target.role.value})
+    db.commit()
+    invalidate_listings_cache()
     return success({"status": "unbanned"})
 
 
@@ -485,7 +511,7 @@ def update_user_role(
     user_id: int,
     payload: AdminUserRoleUpdate,
     user: User = Depends(require_role([UserRole.ADMIN])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
@@ -499,9 +525,11 @@ def update_user_role(
     else:
         target.status = UserStatus.ACTIVE
     db.add(target)
-    db.commit()
+    db.flush()
     log_audit(db, user.id, "USER_ROLE_UPDATED", "user", user_id, {"role": target.role.value})
     recalculate_trust_score(db, target.id)
+    db.commit()
+    invalidate_listings_cache()
     return success({"status": "updated"})
 
 
@@ -510,12 +538,13 @@ def add_user_note(
     user_id: int,
     payload: AdminUserNote,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     target = db.query(User).filter(User.id == user_id).first()
     if not target:
         raise HTTPException(status_code=404, detail="User not found")
     log_audit(db, user.id, "USER_NOTE", "user", user_id, {"note": payload.note})
+    db.commit()
     return success({"status": "noted"})
 
 
@@ -527,7 +556,7 @@ def list_listings(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=5, le=100),
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     base = db.query(Listing).options(joinedload(Listing.owner))
     if state:
@@ -573,7 +602,7 @@ def list_listings(
 def get_listing(
     listing_id: int,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     listing = (
         db.query(Listing)
@@ -611,7 +640,7 @@ def take_down_listing(
     listing_id: int,
     payload: AdminListingAction,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     if not payload.reason:
         raise HTTPException(status_code=400, detail="Reason required")
@@ -620,10 +649,11 @@ def take_down_listing(
         raise HTTPException(status_code=404, detail="Listing not found")
     listing.state = ListingState.REJECTED
     db.add(listing)
-    db.commit()
-    invalidate_listings_cache()
+    db.flush()
 
     log_audit(db, user.id, "LISTING_TAKEDOWN", "listing", listing_id, {"reason": payload.reason})
+    db.commit()
+    invalidate_listings_cache()
     return success({"status": "taken_down"})
 
 
@@ -632,7 +662,7 @@ def reject_listing(
     listing_id: int,
     payload: AdminListingAction,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     if not payload.reason:
         raise HTTPException(status_code=400, detail="Reason required")
@@ -641,8 +671,7 @@ def reject_listing(
         raise HTTPException(status_code=404, detail="Listing not found")
     listing.state = ListingState.REJECTED
     db.add(listing)
-    db.commit()
-    invalidate_listings_cache()
+    db.flush()
     log_audit(
         db,
         user.id,
@@ -651,6 +680,8 @@ def reject_listing(
         listing_id,
         {"reason": payload.reason, "reason_code": payload.reason_code},
     )
+    db.commit()
+    invalidate_listings_cache()
     return success({"status": "rejected"})
 
 
@@ -659,16 +690,17 @@ def archive_listing(
     listing_id: int,
     payload: AdminListingAction,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     listing.state = ListingState.ARCHIVED
     db.add(listing)
+    db.flush()
+    log_audit(db, user.id, "LISTING_ARCHIVED", "listing", listing_id, {"reason": payload.reason})
     db.commit()
     invalidate_listings_cache()
-    log_audit(db, user.id, "LISTING_ARCHIVED", "listing", listing_id, {"reason": payload.reason})
     return success({"status": "archived"})
 
 
@@ -677,7 +709,7 @@ def add_listing_note(
     listing_id: int,
     payload: AdminListingAction,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     if not payload.reason:
         raise HTTPException(status_code=400, detail="Reason required")
@@ -685,6 +717,7 @@ def add_listing_note(
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     log_audit(db, user.id, "LISTING_NOTE", "listing", listing_id, {"note": payload.reason})
+    db.commit()
     return success({"status": "noted"})
 
 
@@ -693,16 +726,17 @@ def restore_listing(
     listing_id: int,
     payload: AdminListingAction,
     user: User = Depends(require_role([UserRole.ADMIN])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     listing = db.query(Listing).filter(Listing.id == listing_id).first()
     if not listing:
         raise HTTPException(status_code=404, detail="Listing not found")
     listing.state = ListingState.PUBLISHED
     db.add(listing)
+    db.flush()
+    log_audit(db, user.id, "LISTING_RESTORED", "listing", listing_id, {"reason": payload.reason})
     db.commit()
     invalidate_listings_cache()
-    log_audit(db, user.id, "LISTING_RESTORED", "listing", listing_id, {"reason": payload.reason})
     return success({"status": "restored"})
 
 
@@ -714,7 +748,7 @@ def list_reports(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=20, ge=5, le=100),
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     base = db.query(Report, User).join(User, Report.reporter_id == User.id)
     if status:
@@ -750,7 +784,7 @@ def list_reports(
 def get_report(
     report_id: int,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
@@ -792,9 +826,9 @@ def set_report_status(
     report_id: int,
     payload: AdminReportStatusUpdate,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
-    report = db.query(Report).filter(Report.id == report_id).first()
+    report = db.query(Report).filter(Report.id == report_id).with_for_update().first()
     if not report:
         raise HTTPException(status_code=404, detail="Report not found")
     try:
@@ -804,13 +838,18 @@ def set_report_status(
     if report.status == ReportStatus.RESOLVED:
         report.resolved_by = user.id
         report.resolved_at = utc_now()
+    else:
+        report.resolved_by = None
+        report.resolved_at = None
     db.add(report)
-    db.commit()
-    if report.status == ReportStatus.RESOLVED and report.listing_id:
+    db.flush()
+    if report.listing_id:
         listing = db.query(Listing).filter(Listing.id == report.listing_id).first()
         if listing:
             recalculate_trust_score(db, listing.owner_id)
     log_audit(db, user.id, "REPORT_STATUS_UPDATED", "report", report_id, {"status": report.status.value})
+    db.commit()
+    invalidate_listings_cache()
     return success({"status": report.status.value})
 
 
@@ -819,7 +858,7 @@ def report_action(
     report_id: int,
     payload: AdminReportAction,
     user: User = Depends(require_role([UserRole.ADMIN, UserRole.MODERATOR])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     report = db.query(Report).filter(Report.id == report_id).first()
     if not report:
@@ -830,15 +869,17 @@ def report_action(
         if listing:
             listing.state = ListingState.REJECTED
             db.add(listing)
-            db.commit()
-            invalidate_listings_cache()
+            db.flush()
             meta["listing_id"] = listing.id
     log_audit(db, user.id, "REPORT_ACTION", "report", report_id, meta)
+    db.commit()
+    if "listing_id" in meta:
+        invalidate_listings_cache()
     return success({"status": "action_applied"})
 
 
 @router.get("/settings")
-def get_settings(user: User = Depends(require_role([UserRole.ADMIN])), db: Session = Depends(get_db)):
+def get_settings(user: User = Depends(require_role([UserRole.ADMIN])), db: Session = Depends(get_db, scope="function")):
     settings = db.query(SystemSetting).first()
     if not settings:
         settings = SystemSetting(city_lock="ISTANBUL")
@@ -862,13 +903,13 @@ def get_settings(user: User = Depends(require_role([UserRole.ADMIN])), db: Sessi
 def update_settings(
     payload: AdminSettingsUpdate,
     user: User = Depends(require_role([UserRole.ADMIN])),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     settings = db.query(SystemSetting).first()
     if not settings:
         settings = SystemSetting(city_lock="ISTANBUL")
         db.add(settings)
-        db.commit()
+        db.flush()
 
     updated = {}
     if payload.stale_days is not None:
@@ -896,13 +937,14 @@ def update_settings(
         settings.city_lock = payload.city_lock
         updated["city_lock"] = payload.city_lock
     if payload.listing_fee is not None or payload.membership_fee is not None:
-        fees = settings.fees or {}
+        fees = dict(settings.fees or {})
         if payload.listing_fee is not None:
             fees["listing_fee"] = payload.listing_fee
         if payload.membership_fee is not None:
             fees["membership_fee"] = payload.membership_fee
         settings.fees = fees
     db.add(settings)
-    db.commit()
+    db.flush()
     log_audit(db, user.id, "SETTINGS_UPDATED", "system", settings.id, {"updated": updated})
+    db.commit()
     return success({"status": "updated"})

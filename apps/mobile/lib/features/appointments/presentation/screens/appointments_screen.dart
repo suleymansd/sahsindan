@@ -7,6 +7,7 @@ import '../../../../core/errors/error_text.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../shared/widgets/app_error_view.dart';
 import '../../../../shared/widgets/app_loading.dart';
+import '../../../../shared/widgets/page_controls.dart';
 import '../../../../shared/widgets/app_empty_state.dart';
 import '../../../../shared/widgets/app_section.dart';
 import '../../../../shared/widgets/app_cell.dart';
@@ -20,6 +21,7 @@ class AppointmentsScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final offset = ref.watch(appointmentsOffsetProvider);
     final asyncItems = ref.watch(appointmentsProvider);
     final myId = ref.watch(authControllerProvider).user?.id;
 
@@ -39,6 +41,7 @@ class AppointmentsScreen extends ConsumerWidget {
                   border: const Border(bottom: BorderSide(color: AppColors.separator)),
                   backgroundColor: AppColors.surface,
                 ),
+                SliverToBoxAdapter(child: PageControls(offset: offset, count: items.length, onChange: (value) => ref.read(appointmentsOffsetProvider.notifier).state = value)),
                 if (items.isEmpty)
                   SliverFillRemaining(
                     hasScrollBody: false,

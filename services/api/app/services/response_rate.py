@@ -28,4 +28,4 @@ def update_response_time(db: Session, thread: Thread, sender_id: int):
     else:
         user.response_time_minutes_avg = int((user.response_time_minutes_avg + minutes) / 2)
     db.add(user)
-    db.commit()
+    db.flush()

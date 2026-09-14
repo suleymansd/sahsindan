@@ -1,0 +1,23 @@
+{
+  "environment": "isolated local production Docker Compose; HTTPS certificate verified",
+  "checks_passed": [
+    "verified HTTPS readiness",
+    "web login page",
+    "private storage isolation",
+    "admin MFA required",
+    "admin MFA success",
+    "MFA replay rejected",
+    "registration",
+    "role isolation",
+    "document upload",
+    "signed private downloads",
+    "manual verification requires evidence",
+    "six-photo listing publication",
+    "public photo download",
+    "favorites",
+    "persistent messages",
+    "WSS message delivery"
+  ],
+  "real_mail_sent": false,
+  "public_deployment": false
+}

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import BackgroundTasks, APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
@@ -7,6 +7,7 @@ from app.core.rate_limit import rate_limit
 from app.core.response import success
 from app.db.models import Listing, ListingPhoto, ListingState, Message, Profile, Thread, User
 from app.db.session import get_db
+from app.services.unique_relations import get_or_create_relation
 from app.schemas.messaging import MessageCreate, ThreadCreate
 from app.services.listing_helpers import last_active_bucket, response_time_bucket
 from app.services.realtime import realtime_hub
@@ -17,13 +18,16 @@ from app.utils.storage import presigned_url
 router = APIRouter()
 
 
-def _thread_out(db: Session, thread: Thread) -> dict:
+def _thread_out(db: Session, thread: Thread, before_id: int | None = None, limit: int = 100) -> dict:
     messages = (
         db.query(Message)
         .filter(Message.thread_id == thread.id)
-        .order_by(Message.created_at.asc())
+        .filter(Message.id < before_id if before_id else True)
+        .order_by(Message.id.desc())
+        .limit(limit)
         .all()
     )
+    messages.reverse()
     return {
         "id": thread.id,
         "listing_id": thread.listing_id,
@@ -70,12 +74,9 @@ def _threads_out_batch(db: Session, threads: list[Thread]) -> list[dict]:
         return []
 
     thread_ids = [thread.id for thread in threads]
-    messages = (
-        db.query(Message)
-        .filter(Message.thread_id.in_(thread_ids))
-        .order_by(Message.thread_id.asc(), Message.created_at.asc(), Message.id.asc())
-        .all()
-    )
+    # Window each conversation independently; one busy thread cannot evict all others.
+    ranked = db.query(Message.id.label("id"), func.row_number().over(partition_by=Message.thread_id, order_by=Message.id.desc()).label("position")).filter(Message.thread_id.in_(thread_ids)).subquery()
+    messages = db.query(Message).join(ranked, ranked.c.id == Message.id).filter(ranked.c.position <= 30).order_by(Message.thread_id, Message.id).all()
     messages_by_thread: dict[int, list[Message]] = {}
     for message in messages:
         messages_by_thread.setdefault(message.thread_id, []).append(message)
@@ -191,11 +192,11 @@ def _thread_summaries_out_batch(db: Session, current_user: User, threads: list[T
 
 
 @router.get("")
-def list_threads(request: Request, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def list_threads(request: Request, limit: int = Query(default=50, ge=1, le=100), offset: int = Query(default=0, ge=0, le=50000), user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     threads = (
         db.query(Thread)
         .filter((Thread.buyer_id == user.id) | (Thread.seller_id == user.id))
-        .order_by(Thread.updated_at.desc())
+        .order_by(Thread.updated_at.desc(), Thread.id.desc()).offset(offset).limit(limit)
         .all()
     )
     client = request.headers.get("x-client", "").lower()
@@ -205,42 +206,35 @@ def list_threads(request: Request, user: User = Depends(require_verified), db: S
 
 
 @router.get("/{thread_id}")
-def get_thread(thread_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def get_thread(thread_id: int, before_id: int | None = Query(default=None, ge=1), limit: int = Query(default=100, ge=1, le=200), user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     thread = db.query(Thread).filter(Thread.id == thread_id).first()
     if not thread or user.id not in [thread.buyer_id, thread.seller_id]:
         raise HTTPException(status_code=404, detail="Thread not found")
-    return success(_thread_out(db, thread))
+    return success(_thread_out(db, thread, before_id, limit))
 
 
 @router.post("")
-def create_thread(payload: ThreadCreate, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def create_thread(payload: ThreadCreate, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     listing = db.query(Listing).filter(Listing.id == payload.listing_id).first()
     if not listing or listing.state != ListingState.PUBLISHED:
         raise HTTPException(status_code=400, detail="Listing not available")
     if listing.owner_id == user.id:
         raise HTTPException(status_code=400, detail="Cannot message yourself")
 
-    existing = (
-        db.query(Thread)
-        .filter(Thread.listing_id == listing.id, Thread.buyer_id == user.id)
-        .first()
+    thread, created = get_or_create_relation(
+        db, Thread, {"listing_id": listing.id, "buyer_id": user.id}, {"seller_id": listing.owner_id},
     )
-    if existing:
-        return success(_thread_out(db, existing))
-
-    thread = Thread(listing_id=listing.id, buyer_id=user.id, seller_id=listing.owner_id)
-    db.add(thread)
     db.commit()
-    db.refresh(thread)
-    return success(_thread_out(db, thread), status_code=201)
+    return success(_thread_out(db, thread), status_code=201 if created else 200)
 
 
 @router.post("/{thread_id}/messages", dependencies=[Depends(rate_limit(limit=20, window_seconds=60))])
-async def send_message(
+def send_message(
     thread_id: int,
+    background_tasks: BackgroundTasks,
     payload: MessageCreate,
     user: User = Depends(require_verified),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_db, scope="function"),
 ):
     thread = db.query(Thread).filter(Thread.id == thread_id).first()
     if not thread or user.id not in [thread.buyer_id, thread.seller_id]:
@@ -250,13 +244,13 @@ async def send_message(
     db.add(message)
     thread.last_message_at = utc_now()
     db.add(thread)
+    db.flush()
+    update_response_time(db, thread, user.id)
     db.commit()
     db.refresh(message)
 
-    update_response_time(db, thread, user.id)
-
     recipient_id = thread.seller_id if message.sender_id == thread.buyer_id else thread.buyer_id
-    await realtime_hub.emit_to_many(
+    background_tasks.add_task(realtime_hub.emit_to_many,
         [thread.buyer_id, thread.seller_id],
         {
             "type": "new_message",
@@ -276,7 +270,7 @@ async def send_message(
 
 
 @router.post("/{thread_id}/read")
-async def mark_read(thread_id: int, user: User = Depends(require_verified), db: Session = Depends(get_db)):
+def mark_read(thread_id: int, background_tasks: BackgroundTasks, user: User = Depends(require_verified), db: Session = Depends(get_db, scope="function")):
     thread = db.query(Thread).filter(Thread.id == thread_id).first()
     if not thread or user.id not in [thread.buyer_id, thread.seller_id]:
         raise HTTPException(status_code=404, detail="Thread not found")
@@ -295,7 +289,7 @@ async def mark_read(thread_id: int, user: User = Depends(require_verified), db: 
     db.add(thread)
     db.commit()
 
-    await realtime_hub.emit_to_many(
+    background_tasks.add_task(realtime_hub.emit_to_many,
         [thread.buyer_id, thread.seller_id],
         {
             "type": "messages_read",

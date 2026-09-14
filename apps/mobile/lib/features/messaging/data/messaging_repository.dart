@@ -16,8 +16,8 @@ class MessagingRepository {
     return env.data;
   }
 
-  Future<Thread> getThread(int id) async {
-    final res = await _dio.get('/threads/$id');
+  Future<Thread> getThread(int id, {int? beforeId}) async {
+    final res = await _dio.get('/threads/$id', queryParameters: {'limit': 100, if (beforeId != null) 'before_id': beforeId});
     final env = ApiEnvelope.fromJson(res.data as Map<String, dynamic>, (obj) => Thread.fromJson(obj as Map<String, dynamic>));
     return env.data;
   }

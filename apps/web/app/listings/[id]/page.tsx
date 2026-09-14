@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 
-export default function LegacyListingDetail({ params }: { params: { id: string } }) {
-  redirect(`/ilanlar/${params.id}`);
+export default async function LegacyListingDetail({ params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params;
+  redirect(`/ilanlar/${id}`);
 }

@@ -16,21 +16,26 @@ from app.api.router import api_router
 from app.core.config import settings
 from app.core.rate_limit import RateLimitException, rate_limit_exception_handler
 from app.core.response import error
+from app.core.resource_limits import ResourceLimitsMiddleware
 from app.db.session import SessionLocal
 from app.services.stale import run_stale_job
+from app.services.realtime import realtime_hub
 
-# Disable all logging except errors
-logging.getLogger().setLevel(logging.ERROR)
-logging.getLogger("uvicorn").setLevel(logging.ERROR)
-logging.getLogger("uvicorn.access").setLevel(logging.ERROR)
-logging.getLogger("fastapi").setLevel(logging.ERROR)
-logging.getLogger("sqlalchemy").setLevel(logging.ERROR)
+# Keep operational failures visible; do not log request bodies or credentials
+logging.getLogger().setLevel(logging.WARNING)
+logging.getLogger("uvicorn").setLevel(logging.WARNING)
+logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
+logging.getLogger("fastapi").setLevel(logging.WARNING)
+logging.getLogger("sqlalchemy").setLevel(logging.WARNING)
 
 async def stale_job_loop():
     while True:
         db: Session = SessionLocal()
         try:
             run_stale_job(db)
+        except Exception:
+            db.rollback()
+            logging.getLogger(__name__).exception("Stale listing job failed; retrying next interval")
         finally:
             db.close()
         await asyncio.sleep(60)
@@ -38,19 +43,21 @@ async def stale_job_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):  # noqa: ARG001
+    await realtime_hub.start()
     task = None
     if not settings.disable_stale_job:
         task = asyncio.create_task(stale_job_loop())
     try:
         yield
     finally:
+        await realtime_hub.stop()
         if task:
             task.cancel()
             with suppress(asyncio.CancelledError):
                 await task
 
 
-app = FastAPI(title="Trust Market API", lifespan=lifespan)
+app = FastAPI(title="Trust Market API", lifespan=lifespan, docs_url=None if settings.app_env == "production" else "/docs", redoc_url=None if settings.app_env == "production" else "/redoc")
 
 # services/api root (contains "storage/").
 BASE_DIR = Path(__file__).resolve().parents[1]
@@ -69,17 +76,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=1024)
+app.add_middleware(ResourceLimitsMiddleware)
 
 app.include_router(api_router, prefix="/api")
 
+def mount_public_storage(application: FastAPI, storage_root: Path):
+    public_storage = storage_root / "listings"
+    public_storage.mkdir(parents=True, exist_ok=True)
+    application.mount("/storage/listings", StaticFiles(directory=str(public_storage)), name="storage")
+
+
 if settings.disable_storage:
-    app.mount("/storage", StaticFiles(directory=str(BASE_DIR / "storage")), name="storage")
+    mount_public_storage(app, BASE_DIR / "storage")
 
 
 @app.exception_handler(RequestValidationError)
 def validation_exception_handler(request, exc):
     errors = []
     for item in exc.errors():
+        item = {k: v for k, v in item.items() if k != "input"}
         if "ctx" in item and isinstance(item["ctx"], dict):
             item = {**item, "ctx": {k: str(v) for k, v in item["ctx"].items()}}
         errors.append(item)
@@ -88,7 +103,9 @@ def validation_exception_handler(request, exc):
 
 @app.exception_handler(HTTPException)
 def http_exception_handler(request, exc):
-    return error("HTTP_ERROR", str(exc.detail), {}, status_code=exc.status_code)
+    response = error("HTTP_ERROR", str(exc.detail), {}, status_code=exc.status_code)
+    response.headers.update(exc.headers or {})
+    return response
 
 
 @app.exception_handler(SQLAlchemyTimeoutError)

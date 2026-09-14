@@ -1,0 +1,10 @@
+[Unit]
+Description=Check TrustMarket every minute
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=1min
+Unit=trustmarket-monitor.service
+
+[Install]
+WantedBy=timers.target

@@ -23,7 +23,7 @@ class AppTheme {
       useMaterial3: true,
       brightness: Brightness.light,
       colorScheme: scheme,
-      scaffoldBackgroundColor: Colors.transparent,
+      scaffoldBackgroundColor: AppColors.background,
       dividerColor: AppColors.separator,
       shadowColor: AppColors.shadow,
       splashFactory: InkRipple.splashFactory,
@@ -31,7 +31,7 @@ class AppTheme {
         brightness: Brightness.light,
         primaryColor: AppColors.primary,
         barBackgroundColor: AppColors.navBar,
-        scaffoldBackgroundColor: Colors.transparent,
+        scaffoldBackgroundColor: AppColors.background,
       ),
     );
 
@@ -41,7 +41,7 @@ class AppTheme {
         displayColor: AppColors.textPrimary,
       ),
       appBarTheme: const AppBarTheme(
-        backgroundColor: Colors.transparent,
+        backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: true,
@@ -59,7 +59,7 @@ class AppTheme {
         surfaceTintColor: Colors.transparent,
         color: AppColors.surface,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(12),
           side: const BorderSide(color: AppColors.separator),
         ),
       ),
@@ -67,23 +67,25 @@ class AppTheme {
         behavior: SnackBarBehavior.floating,
         backgroundColor: AppColors.textPrimary,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-        contentTextStyle: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+        contentTextStyle:
+            const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: AppColors.surface,
         isDense: true,
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.separator),
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.separator),
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(8),
           borderSide: const BorderSide(color: AppColors.primary, width: 1.7),
         ),
         hintStyle: const TextStyle(color: AppColors.textTertiary),
@@ -94,7 +96,7 @@ class AppTheme {
           backgroundColor: AppColors.primary,
           foregroundColor: Colors.white,
           disabledBackgroundColor: AppColors.primary.withValues(alpha: 0.45),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
           elevation: 0,
@@ -104,7 +106,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.primary,
           side: const BorderSide(color: AppColors.separator),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
           textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15),
         ),
@@ -119,7 +121,8 @@ class AppTheme {
         backgroundColor: AppColors.surface,
         selectedColor: AppColors.primary.withValues(alpha: 0.16),
         side: const BorderSide(color: AppColors.separator),
-        labelStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600),
+        labelStyle: const TextStyle(
+            color: AppColors.textPrimary, fontWeight: FontWeight.w600),
       ),
       switchTheme: SwitchThemeData(
         trackColor: WidgetStateProperty.resolveWith((states) {

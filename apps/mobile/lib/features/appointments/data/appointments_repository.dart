@@ -8,8 +8,8 @@ class AppointmentsRepository {
 
   final Dio _dio;
 
-  Future<List<Appointment>> inbox() async {
-    final res = await _dio.get('/appointments/inbox');
+  Future<List<Appointment>> inbox({int offset = 0}) async {
+    final res = await _dio.get('/appointments/inbox', queryParameters: {'limit': 50, 'offset': offset});
     final env = ApiEnvelope.fromJson(res.data as Map<String, dynamic>, (obj) {
       return (obj as List<dynamic>).map((e) => Appointment.fromJson(e as Map<String, dynamic>)).toList();
     });

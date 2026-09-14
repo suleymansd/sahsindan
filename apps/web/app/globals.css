@@ -3,45 +3,39 @@
 @tailwind utilities;
 
 :root {
-  --font-sans: var(--font-manrope), "Manrope", "Avenir Next", "Segoe UI", sans-serif;
-  --font-display: var(--font-sora), "Sora", "Avenir Next", "Segoe UI", sans-serif;
-
-  --background: 212 100% 98%;
-  --foreground: 221 52% 14%;
-  --text: 221 52% 14%;
-  --text-muted: 219 20% 43%;
-
+  --font-sans: var(--font-manrope), "Avenir Next", "Segoe UI", sans-serif;
+  --font-display: var(--font-sora), "Avenir Next", "Segoe UI", sans-serif;
+  --background: 210 29% 97%;
+  --foreground: 217 46% 19%;
+  --text: 217 46% 19%;
+  --text-muted: 215 16% 44%;
   --surface: 0 0% 100%;
-  --surface-2: 214 78% 97%;
-  --surface-3: 213 58% 94%;
-  --border: 217 45% 88%;
-  --border-strong: 217 34% 73%;
-
-  --primary: 215 89% 52%;
-  --primary-hover: 215 83% 47%;
-  --primary-light: 214 100% 95%;
+  --surface-2: 210 27% 96%;
+  --surface-3: 214 24% 92%;
+  --border: 214 25% 89%;
+  --border-strong: 215 20% 73%;
+  --primary: 217 46% 19%;
+  --primary-hover: 217 43% 26%;
+  --primary-light: 214 36% 94%;
   --primary-foreground: 0 0% 100%;
-
-  --accent: 187 88% 36%;
-  --accent-hover: 187 82% 31%;
-  --accent-light: 186 92% 94%;
-  --accent-foreground: 187 87% 11%;
-
-  --success: 155 68% 36%;
-  --success-bg: 154 70% 93%;
-  --warning: 36 93% 50%;
-  --warning-bg: 38 94% 93%;
-  --danger: 0 72% 52%;
-  --danger-bg: 0 77% 95%;
-  --info: 209 85% 50%;
-  --info-bg: 206 88% 94%;
-
+  --accent: 159 85% 30%;
+  --accent-hover: 159 85% 24%;
+  --accent-light: 156 55% 94%;
+  --accent-foreground: 0 0% 100%;
+  --success: 159 85% 30%;
+  --success-bg: 156 55% 94%;
+  --warning: 32 88% 34%;
+  --warning-bg: 40 100% 95%;
+  --danger: 0 70% 44%;
+  --danger-bg: 0 85% 97%;
+  --info: 192 100% 30%;
+  --info-bg: 192 80% 95%;
   --card: 0 0% 100%;
-  --card-foreground: 221 52% 14%;
-  --secondary: 214 78% 97%;
-  --muted: 214 78% 97%;
-  --muted-foreground: 219 20% 43%;
-  --ring: 215 89% 52%;
+  --card-foreground: 217 46% 19%;
+  --secondary: 210 27% 96%;
+  --muted: 210 27% 96%;
+  --muted-foreground: 215 16% 44%;
+  --ring: 192 100% 35%;
 }
 
 .dark {
@@ -59,7 +53,7 @@
   --primary: 214 95% 64%;
   --primary-hover: 214 95% 69%;
   --primary-light: 214 60% 20%;
-  --primary-foreground: 0 0% 100%;
+  --primary-foreground: 217 49% 12%;
 
   --accent: 185 80% 50%;
   --accent-hover: 185 80% 57%;
@@ -99,25 +93,7 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: "cv02", "cv03", "cv04", "cv11";
   letter-spacing: -0.004em;
-  background-image:
-    radial-gradient(circle at 6% 0%, hsl(var(--primary) / 0.16), transparent 28%),
-    radial-gradient(circle at 96% 3%, hsl(var(--accent) / 0.14), transparent 26%),
-    linear-gradient(180deg, hsl(var(--background)), hsl(var(--background)));
-  background-attachment: fixed;
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  background:
-    linear-gradient(hsl(var(--border) / 0.18) 1px, transparent 1px),
-    linear-gradient(90deg, hsl(var(--border) / 0.16) 1px, transparent 1px);
-  background-size: 34px 34px;
-  opacity: 0.32;
-  mask-image: radial-gradient(circle at 50% 20%, black, transparent 78%);
-  z-index: -1;
+  background-color: hsl(var(--background));
 }
 
 h1,
@@ -138,7 +114,7 @@ h6 {
 
 .container {
   @apply mx-auto w-full px-4;
-  max-width: 1320px;
+  max-width: 1280px;
 }
 
 @media (min-width: 640px) {
@@ -169,15 +145,15 @@ h6 {
 }
 
 .page-surface {
-  @apply rounded-3xl border border-border bg-surface/90 backdrop-blur-md shadow-large;
+  @apply rounded-2xl border border-border bg-surface;
 }
 
 .card {
-  @apply rounded-2xl border border-border/85 bg-surface/90 backdrop-blur-md shadow-card;
+  @apply rounded-xl border border-border bg-surface;
 }
 
 .card-hover {
-  @apply card transition-all duration-200 hover:-translate-y-0.5 hover:border-border-strong hover:shadow-card-hover;
+  @apply card transition-all duration-200 hover:border-border-strong hover:shadow-card-hover;
 }
 
 .card-interactive {
@@ -185,11 +161,11 @@ h6 {
 }
 
 .panel-glass {
-  @apply rounded-3xl border border-border/75 bg-surface/80 backdrop-blur-xl shadow-large;
+  @apply rounded-xl border border-border bg-surface;
 }
 
 .panel-strong {
-  @apply rounded-3xl border border-border/80 bg-gradient-to-br from-surface via-surface to-surface-2 shadow-xl;
+  @apply rounded-xl border border-border bg-surface;
 }
 
 .section {
@@ -299,13 +275,8 @@ textarea:focus-visible {
   justify-content: center;
   width: 42px;
   height: 42px;
-  border-radius: 13px;
-  border: 1px solid hsl(var(--border));
-  background: linear-gradient(160deg, hsl(var(--surface)), hsl(var(--surface-2)) 70%, hsl(var(--primary-light)));
-  box-shadow:
-    inset 0 1px 0 hsl(var(--surface)),
-    0 6px 14px hsl(var(--primary) / 0.12),
-    0 1px 2px rgba(2, 13, 33, 0.08);
+  border-radius: 10px;
+  background: hsl(var(--primary-light));
 }
 
 .hero-orb {
@@ -357,4 +328,14 @@ textarea:focus-visible {
   .no-print {
     display: none !important;
   }
+}
+
+.market-hero { padding: 64px 0 48px; }
+.market-title { font-size: clamp(2.25rem, 4.5vw, 3.75rem); line-height: 1.18; font-weight: 650; letter-spacing: -0.055em; }
+.market-search { box-shadow: 0 8px 32px rgb(26 43 71 / 5%); }
+.market-eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; }
+.market-nav-link { border-bottom: 2px solid transparent; }
+.market-nav-link[aria-current="page"] { border-color: hsl(var(--accent)); color: hsl(var(--foreground)); }
+@media (max-width: 639px) {
+  .market-hero { padding: 36px 0 32px; }
 }

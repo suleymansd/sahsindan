@@ -5,7 +5,7 @@ Flutter + Riverpod + go_router + Dio istemcisi.
 Bu repo iki sekilde calisir:
 
 1) Docker + Nginx (recommended): API proxy `http://localhost:8080/api`
-2) Docker'siz (SQLite + Uvicorn): API dogrudan `http://localhost:8080` (prefix yok)
+2) Docker'siz (SQLite + Uvicorn): API dogrudan `http://localhost:8080/api`
 
 ## Gereksinimler
 
@@ -34,25 +34,27 @@ Docker calismiyorsa veya hizli test istiyorsan:
 ./scripts/dev_mobile_web.sh
 ```
 
-- API: `http://127.0.0.1:8080`
+- API: `http://127.0.0.1:8080/api`
 - Mobile web: `http://127.0.0.1:3005/`
 
 ## Mobile'i calistir
 
 ```bash
 cd apps/mobile
+# Ilk kurulumda; mevcut .env dosyasini koru
+cp .env.example .env
 flutter pub get
 flutter run
 ```
 
 ## Base URL (Env)
 
-`apps/mobile/.env` icinden okunur. Default `.env` docker-free (prefix yok) olacak sekilde ayarli.
+`apps/mobile/.env` icinden okunur. Her iki calisma modunda da API adresi `/api` ile biter. Ilk kurulumda `.env.example` dosyasini `.env` olarak kopyala.
 
 Docker-free (services/api/scripts/dev_local.sh):
 
-- iOS Simulator / Web: `http://localhost:8080`
-- Android Emulator: `http://10.0.2.2:8080`
+- iOS Simulator / Web: `http://localhost:8080/api`
+- Android Emulator: `http://10.0.2.2:8080/api`
 
 Nginx proxy ile (make dev / infra):
 
@@ -62,14 +64,14 @@ Nginx proxy ile (make dev / infra):
 Ornek:
 
 ```env
-API_BASE_URL=http://10.0.2.2:8080
+API_BASE_URL=http://10.0.2.2:8080/api
 LOG_NETWORK=true
 ```
 
 Alternatif olarak build-time:
 
 ```bash
-flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080
+flutter run --dart-define=API_BASE_URL=http://10.0.2.2:8080/api
 ```
 
 ## Demo Hesaplar (seed)
@@ -98,3 +100,9 @@ Dev ortaminda `http://localhost` kullandigimiz icin:
 - iOS: `NSAllowsArbitraryLoads=true` acik (ATS).
 
 Prod icin HTTPS kullanip bu ayarlari daraltmanizi oneririm.
+# Unicode klasör yolunda analiz
+
+Flutter aracının LSP `FormatException` hatası verdiği ortamlarda, depo kökünden
+`python3 scripts/analyze_mobile.py --flutter /tam/yol/flutter` çalıştırılabilir.
+Bu komut kaynakların geçici ASCII kopyasında aynı bağımlılıklarla analiz yapar;
+SDK veya asıl proje dosyalarını değiştirmez.

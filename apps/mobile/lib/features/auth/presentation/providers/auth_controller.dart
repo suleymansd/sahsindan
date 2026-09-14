@@ -71,9 +71,9 @@ class AuthController extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> login(String email, String password) async {
+  Future<void> login(String email, String password, {String? otpCode}) async {
     try {
-      final user = await _repo.login(email: email, password: password);
+      final user = await _repo.login(email: email, password: password, otpCode: otpCode);
       final verification = await _loadVerificationIfNeeded(user);
       state = AuthState(stage: _stageFromUser(user), user: user, verification: verification);
     } catch (e) {

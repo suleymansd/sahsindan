@@ -12,22 +12,21 @@ def _cache_enabled() -> bool:
     return settings.listings_cache_enabled and settings.listings_cache_ttl_seconds > 0
 
 
-def _cache_version() -> int:
+def cache_version() -> int:
     try:
         raw = redis_client.get(_LISTINGS_CACHE_VERSION_KEY)
         if raw is None:
-            redis_client.set(_LISTINGS_CACHE_VERSION_KEY, "1")
-            return 1
+            return 0
         return int(raw)
     except Exception:
         return 1
 
 
-def _cache_key(filters: dict[str, Any]) -> str:
+def _cache_key(filters: dict[str, Any], version: int | None = None) -> str:
     fingerprint = hashlib.sha256(
         json.dumps(filters, sort_keys=True, separators=(",", ":"), ensure_ascii=True).encode("utf-8")
     ).hexdigest()
-    return f"cache:listings:v{_cache_version()}:{fingerprint}"
+    return f"cache:listings:v{cache_version() if version is None else version}:{fingerprint}"
 
 
 def get_cached_public_listings(filters: dict[str, Any]) -> list[dict] | None:
@@ -49,10 +48,10 @@ def get_cached_public_listings(filters: dict[str, Any]) -> list[dict] | None:
     return None
 
 
-def set_cached_public_listings(filters: dict[str, Any], payload: list[dict]) -> None:
+def set_cached_public_listings(filters: dict[str, Any], payload: list[dict], version: int | None = None) -> None:
     if not _cache_enabled():
         return
-    key = _cache_key(filters)
+    key = _cache_key(filters, version)
     try:
         redis_client.set(key, json.dumps(payload, separators=(",", ":"), ensure_ascii=False), ex=settings.listings_cache_ttl_seconds)
     except Exception:

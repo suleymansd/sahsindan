@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 import type { LucideIcon } from "lucide-react";
 import { AlertCircle, Eye, EyeOff, Loader2 } from "lucide-react";
 import { z } from "zod";
@@ -11,6 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth, type UserSummary } from "@/lib/auth";
 import { toFriendlyError } from "@/lib/errors";
+import { safeRedirect } from "@/lib/redirect";
 
 type RoleLoginPanelProps = {
   badge: string;
@@ -35,8 +36,7 @@ export function RoleLoginPanel({
   secondaryLabel,
   secondaryHref,
 }: RoleLoginPanelProps) {
-  const { login } = useAuth();
-  const router = useRouter();
+  const { login, logout } = useAuth();
   const searchParams = useSearchParams();
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,16 +59,17 @@ export function RoleLoginPanel({
         password: String(formData.get("password")),
       });
 
-      const currentUser = await login(values.email, values.password);
+      const currentUser = await login(values.email, values.password, expectedRoles, String(formData.get("otp_code") || "").trim() || undefined);
       if (!expectedRoles.includes(currentUser.role)) {
-        window.dispatchEvent(new CustomEvent("auth:logout"));
+        await logout();
         setError(roleErrorMessage);
         return;
       }
 
       const redirectParam = searchParams?.get("redirect") || null;
       const next = resolveRedirect(currentUser, redirectParam);
-      router.replace(next);
+      // Start from the issued cookie; avoid racing RouteGuard's client navigation.
+      window.location.replace(safeRedirect(next));
     } catch (err) {
       if (err instanceof z.ZodError) {
         setError("Lütfen geçerli bir e-posta ve en az 8 karakterli şifre girin.");
@@ -140,6 +141,14 @@ export function RoleLoginPanel({
             </button>
           </div>
         </div>
+
+        {expectedRoles.some((role) => ["ADMIN", "MODERATOR"].includes(role)) && (
+          <div className="space-y-1.5">
+            <label htmlFor="otp_code" className="text-sm font-medium">Doğrulayıcı uygulama kodu</label>
+            <Input id="otp_code" name="otp_code" inputMode="numeric" autoComplete="one-time-code" maxLength={6} pattern="[0-9]{6}" placeholder="6 haneli kod" />
+            <p className="text-xs text-text-muted">Hesabınıza bağlı doğrulayıcı uygulamadaki güncel kodu girin.</p>
+          </div>
+        )}
 
         {error && (
           <div

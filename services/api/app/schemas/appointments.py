@@ -1,12 +1,12 @@
 from datetime import datetime
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AppointmentCreate(BaseModel):
     listing_id: int
     scheduled_at: datetime
-    location: str
-    notes: str | None = None
+    location: str = Field(min_length=1, max_length=255)
+    notes: str | None = Field(default=None, max_length=2000)
 
 
 class AppointmentOut(BaseModel):
@@ -16,5 +16,5 @@ class AppointmentOut(BaseModel):
     seller_id: int
     status: str
     scheduled_at: datetime
-    location: str
+    location: str = Field(min_length=1, max_length=255)
     notes: str | None

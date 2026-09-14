@@ -1,0 +1,13 @@
+[Unit]
+Description=TrustMarket daily encrypted database/files/budget snapshot
+After=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/trustmarket
+EnvironmentFile=/opt/trustmarket/infra/.env.operations
+ExecStart=/opt/trustmarket/scripts/scheduled_backup.sh
+TimeoutStartSec=30min
+UMask=0077
+StandardOutput=journal
+StandardError=journal

@@ -10,11 +10,11 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-gradient-to-r from-primary to-accent text-primary-foreground shadow-glow hover:from-primary-hover hover:to-accent-hover hover:brightness-[1.02]",
+          "bg-primary text-primary-foreground hover:bg-primary-hover",
         outline:
-          "border border-border bg-surface/85 text-foreground backdrop-blur-md hover:border-border-strong hover:bg-surface-2",
+          "border border-border bg-surface text-foreground hover:border-border-strong hover:bg-surface-2",
         secondary:
-          "bg-gradient-to-r from-accent to-primary text-primary-foreground shadow-medium hover:brightness-[1.04]",
+          "bg-accent text-accent-foreground hover:bg-accent-hover",
         destructive:
           "bg-danger text-white shadow-medium hover:brightness-95",
         ghost: "text-foreground hover:bg-surface-2/80",

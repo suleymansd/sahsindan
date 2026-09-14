@@ -11,9 +11,8 @@ class NetworkLoggingInterceptor extends Interceptor {
   void onRequest(RequestOptions options, RequestInterceptorHandler handler) {
     if (enabled) {
       developer.log(
-        '-> ${options.method} ${options.uri}',
+        '-> ${options.method} ${options.uri.path}',
         name: 'net',
-        error: options.data is FormData ? 'FormData' : options.data,
       );
     }
     handler.next(options);
@@ -23,7 +22,7 @@ class NetworkLoggingInterceptor extends Interceptor {
   void onResponse(Response response, ResponseInterceptorHandler handler) {
     if (enabled) {
       developer.log(
-        '<- ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri}',
+        '<- ${response.statusCode} ${response.requestOptions.method} ${response.requestOptions.uri.path}',
         name: 'net',
       );
     }
@@ -34,9 +33,8 @@ class NetworkLoggingInterceptor extends Interceptor {
   void onError(DioException err, ErrorInterceptorHandler handler) {
     if (enabled) {
       developer.log(
-        'xx ${err.response?.statusCode} ${err.requestOptions.method} ${err.requestOptions.uri}',
+        'xx ${err.response?.statusCode} ${err.requestOptions.method} ${err.requestOptions.uri.path}',
         name: 'net',
-        error: err,
       );
     }
     handler.next(err);

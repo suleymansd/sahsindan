@@ -25,6 +25,7 @@ class ListingsRepository {
     int? mileageMin,
     int? mileageMax,
     String sort = 'newest',
+    int offset = 0,
     bool mine = false,
     bool includeInactive = false,
   }) async {
@@ -46,6 +47,8 @@ class ListingsRepository {
         if (mileageMin != null) 'mileage_min': mileageMin,
         if (mileageMax != null) 'mileage_max': mileageMax,
         'sort': sort,
+        'limit': 50,
+        'offset': offset,
         'mine': mine,
         'include_inactive': includeInactive,
       },
@@ -182,8 +185,13 @@ class ListingsRepository {
     await _dio.post('/listings/$listingId/photos/reorder', data: {'photo_ids': photoIds});
   }
 
-  Future<List<Listing>> favorites() async {
-    final res = await _dio.get('/favorites');
+  Future<List<int>> favoriteIds() async {
+    final res = await _dio.get("/favorites/ids");
+    return (res.data["data"] as List).cast<int>();
+  }
+
+  Future<List<Listing>> favorites({int offset = 0}) async {
+    final res = await _dio.get('/favorites', queryParameters: {'limit': 50, 'offset': offset});
     final env = ApiEnvelope.fromJson(res.data as Map<String, dynamic>, (obj) {
       return (obj as List<dynamic>).map((e) => Listing.fromJson(e as Map<String, dynamic>)).toList();
     });

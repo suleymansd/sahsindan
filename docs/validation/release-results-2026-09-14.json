@@ -1,0 +1,82 @@
+{
+  "date": "2026-09-14",
+  "api_postgresql": {
+    "passed": 115,
+    "failed": 0
+  },
+  "api_sqlite": {
+    "passed": 105,
+    "skipped_postgresql_only": 10,
+    "failed": 0
+  },
+  "web_unit": 5,
+  "web_chromium_e2e": 11,
+  "flutter_tests": 14,
+  "flutter_analysis_issues": 0,
+  "production_published": false,
+  "production_containers_started": false,
+  "compose_validated": true,
+  "caddy_validated_version": "2.11.4",
+  "audit": {
+    "npm_production_vulnerabilities": 0,
+    "pip_vulnerabilities": 0
+  },
+  "coverage_sqlite": {
+    "covered_lines": 2133,
+    "num_statements": 2742,
+    "percent_covered": 77.78993435448578,
+    "percent_covered_display": "78",
+    "missing_lines": 609,
+    "excluded_lines": 2,
+    "percent_statements_covered": 77.78993435448578,
+    "percent_statements_covered_display": "78"
+  },
+  "coverage_postgres": {
+    "covered_lines": 2139,
+    "num_statements": 2742,
+    "percent_covered": 78.00875273522976,
+    "percent_covered_display": "78",
+    "missing_lines": 603,
+    "excluded_lines": 2,
+    "percent_statements_covered": 78.00875273522976,
+    "percent_statements_covered_display": "78"
+  },
+  "load_probes": [
+    {
+      "environment": "disposable local PostgreSQL/Redis, 2 Uvicorn workers; direct API, no TLS/proxy, no uploads or websocket load",
+      "concurrent_sessions": 50,
+      "seeded_listings": 1000,
+      "requests": 1000,
+      "elapsed_seconds": 0.71,
+      "requests_per_second": 1410.91,
+      "latency_ms": {
+        "50": 31.61,
+        "95": 49.9,
+        "99": 66.47
+      },
+      "statuses": {
+        "200": 1000
+      },
+      "response_bytes": 10263224,
+      "production_capacity_guarantee": false
+    },
+    {
+      "environment": "disposable local PostgreSQL/Redis, 2 Uvicorn workers; direct API, no TLS/proxy, no uploads or websocket load",
+      "concurrent_sessions": 100,
+      "seeded_listings": 1000,
+      "requests": 2000,
+      "elapsed_seconds": 1.35,
+      "requests_per_second": 1484.46,
+      "latency_ms": {
+        "50": 63.07,
+        "95": 107.2,
+        "99": 142.12
+      },
+      "statuses": {
+        "200": 2000
+      },
+      "response_bytes": 20538028,
+      "production_capacity_guarantee": false
+    }
+  ]
+}

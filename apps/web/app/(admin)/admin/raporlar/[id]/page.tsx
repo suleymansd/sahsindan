@@ -225,7 +225,7 @@ export default function ReportDetailPage() {
             </Button>
             <div className="inline-flex items-center gap-1 rounded-full border border-warning/30 bg-warning-bg px-3 py-1 text-xs text-warning">
               <ShieldBan className="h-3.5 w-3.5" />
-              Aksiyonlar audit log'a kaydedilir
+              Aksiyonlar audit log&apos;a kaydedilir
             </div>
           </div>
         </CardContent>

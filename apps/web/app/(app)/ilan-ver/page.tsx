@@ -55,6 +55,8 @@ export default function NewListingPage() {
           reject(new Error("upload failed"));
         };
         xhr.onerror = () => reject(new Error("upload failed"));
+        xhr.timeout = 60000;
+        xhr.ontimeout = () => reject(new Error("upload timed out"));
         const upload = new FormData();
         upload.append("file", item.file);
         xhr.send(upload);
@@ -73,7 +75,7 @@ export default function NewListingPage() {
       updatePhoto(item.id, { status: "uploading", progress: 0, error: null });
       try {
         const photoId = await uploadWithProgress(createdListingId, item);
-        updatePhoto(item.id, { status: "done", progress: 100, error: null });
+        updatePhoto(item.id, { status: "done", progress: 100, error: null, photoId });
         await apiFetchWithAuth(`/listings/${createdListingId}/photos/reorder`, accessToken, {
           method: "POST",
           body: JSON.stringify({ photo_ids: [photoId] }),
@@ -94,7 +96,8 @@ export default function NewListingPage() {
     setStatus(null);
     setPhotoError(null);
 
-    const formData = new FormData(event.currentTarget);
+    const form = event.currentTarget;
+    const formData = new FormData(form);
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const intent = submitter?.value || "publish";
 
@@ -123,8 +126,8 @@ export default function NewListingPage() {
         },
       };
 
-      const res = await apiFetchWithAuth("/listings", accessToken, {
-        method: "POST",
+      const res = await apiFetchWithAuth(createdListingId ? `/listings/${createdListingId}` : "/listings", accessToken, {
+        method: createdListingId ? "PUT" : "POST",
         body: JSON.stringify(payload),
       });
       setCreatedListingId(res.data.id);
@@ -133,11 +136,15 @@ export default function NewListingPage() {
       let uploadFailed = false;
 
       for (const item of photos) {
+        if (item.photoId) {
+          uploadedIds.push(item.photoId);
+          continue;
+        }
         try {
           updatePhoto(item.id, { status: "uploading", progress: 0, error: null });
           const photoId = await uploadWithProgress(res.data.id, item);
           uploadedIds.push(photoId);
-          updatePhoto(item.id, { status: "done", progress: 100, error: null });
+          updatePhoto(item.id, { status: "done", progress: 100, error: null, photoId });
         } catch (err) {
           uploadFailed = true;
           updatePhoto(item.id, { status: "error", error: "Yükleme başarısız." });
@@ -154,7 +161,7 @@ export default function NewListingPage() {
       if (intent === "publish" && !uploadFailed) {
         await apiFetchWithAuth(`/listings/${res.data.id}/publish`, accessToken, { method: "POST" });
         setStatus("İlan oluşturuldu ve yayına alındı.");
-        event.currentTarget.reset();
+        form.reset();
         setPhotos([]);
         setSelectedChangedParts([]);
         setCreatedListingId(null);
@@ -162,7 +169,7 @@ export default function NewListingPage() {
         setStatus("Bazı fotoğraflar yüklenemedi. İlan taslakta kaldı.");
       } else {
         setStatus("İlan taslak olarak kaydedildi.");
-        event.currentTarget.reset();
+        form.reset();
         setPhotos([]);
         setSelectedChangedParts([]);
         setCreatedListingId(null);
@@ -204,7 +211,7 @@ export default function NewListingPage() {
                   maxFiles={20}
                   onRetry={retryUpload}
                 />
-                {photoError ? <div className="text-xs text-rose-500">{photoError}</div> : null}
+                {photoError ? <div role="alert" className="text-xs text-rose-500">{photoError}</div> : null}
               </div>
               <div className="grid gap-4 md:grid-cols-2">
                 <Input name="brand" placeholder="Marka" required />

@@ -1,0 +1,28 @@
+{
+  "environment": "disposable local PostgreSQL/Redis, 2 Uvicorn workers; direct API, no TLS/proxy, no uploads or websocket load",
+  "concurrent_sessions": 100,
+  "seeded_listings": 1000,
+  "requests": 3961,
+  "elapsed_seconds": 30.45,
+  "requests_per_second": 130.09,
+  "latency_ms": {
+    "50": 58.03,
+    "95": 5047.71,
+    "99": 5102.68
+  },
+  "errors": {
+    "{\"error\":{\"code\":\"SERVICE_UNAVAILABLE\",\"message\":\"Service temporarily overloaded\",\"details\":{}}}": 135
+  },
+  "traffic": "paced reads and favorite writes",
+  "methods": {
+    "GET": 3160,
+    "POST": 429,
+    "DELETE": 372
+  },
+  "statuses": {
+    "200": 3826,
+    "503": 135
+  },
+  "response_bytes": 24304191,
+  "production_capacity_guarantee": false
+}
