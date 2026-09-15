@@ -65,3 +65,10 @@ backups/
 *.agekey.pub
 *.tar.age
 *.tar.age.partial
+
+# Apple signing secrets and generated distribution artifacts
+*.p8
+*.p12
+*.mobileprovision
+*.xcarchive/
+*.ipa

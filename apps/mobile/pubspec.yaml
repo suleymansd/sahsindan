@@ -1,5 +1,5 @@
 name: trustmarket_mobile
-version: 0.1.0
+version: 0.1.0+1
 publish_to: "none"
 
 environment:
@@ -24,6 +24,8 @@ dependencies:
 
 
 dev_dependencies:
+  integration_test:
+    sdk: flutter
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.2

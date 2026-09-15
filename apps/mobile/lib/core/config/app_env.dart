@@ -9,18 +9,18 @@ class AppEnv {
   static String get apiBaseUrl {
     // Highest priority: --dart-define=API_BASE_URL=...
     const defineValue = String.fromEnvironment(EnvKeys.apiBaseUrl, defaultValue: '');
-    if (defineValue.trim().isNotEmpty) return _validatedUrl(defineValue.trim());
+    if (kReleaseMode || defineValue.trim().isNotEmpty) {
+      return validateApiBaseUrl(defineValue.trim(), release: kReleaseMode);
+    }
 
     // Next: .env asset
     try {
       final envValue = dotenv.env[EnvKeys.apiBaseUrl];
-      if (envValue != null && envValue.trim().isNotEmpty) return _validatedUrl(envValue.trim());
+      if (envValue != null && envValue.trim().isNotEmpty) {
+        return validateApiBaseUrl(envValue.trim(), release: false);
+      }
     } catch (_) {
       // dotenv may not be initialized in tests; fall back below.
-    }
-
-    if (kReleaseMode) {
-      throw StateError("Release builds require API_BASE_URL=https://your-domain/api");
     }
 
     // Fallback: platform-based localhost resolution.
@@ -32,12 +32,16 @@ class AppEnv {
     return 'http://localhost:8080/api';
   }
 
-  static String _validatedUrl(String value) {
+  @visibleForTesting
+  static String validateApiBaseUrl(String value, {required bool release}) {
     final uri = Uri.tryParse(value);
-    if (kReleaseMode && (uri == null || uri.scheme != "https" || uri.host.isEmpty)) {
-      throw StateError("Release API_BASE_URL must use HTTPS");
+    if (release &&
+        (uri == null || uri.scheme != 'https' || uri.host.isEmpty ||
+            uri.userInfo.isNotEmpty || uri.hasQuery || uri.hasFragment ||
+            uri.path.replaceAll(RegExp(r'/+$'), '') != '/api')) {
+      throw StateError('Release requires --dart-define=API_BASE_URL=https://your-domain/api');
     }
-    return value;
+    return value.replaceAll(RegExp(r'/+$'), '');
   }
 
   static bool get logNetwork {

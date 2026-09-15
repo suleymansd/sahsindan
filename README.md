@@ -2,6 +2,8 @@
 
 Closed, verified-only marketplace for car listings in Istanbul. Built to eliminate stale listings, fake profiles, and wasted time.
 
+Güncel iOS/yatırımcı demosu ve yayın durumu: [TestFlight hazırlığı](docs/TESTFLIGHT_TR.md).
+
 ## Monorepo Structure
 
 ```

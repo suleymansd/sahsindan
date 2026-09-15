@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/l10n/strings.dart';
 
 class MarketplaceHeader extends StatelessWidget implements PreferredSizeWidget {
   const MarketplaceHeader({super.key});
@@ -25,7 +26,7 @@ class MarketplaceHeader extends StatelessWidget implements PreferredSizeWidget {
                 value: '/app/appointments', child: Text('Randevularım')),
           ],
         ),
-        title: const Text('AI Marketplace',
+        title: const Text(S.appName,
             style: TextStyle(
                 fontSize: 23,
                 fontWeight: FontWeight.w800,

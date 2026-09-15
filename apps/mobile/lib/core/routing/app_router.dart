@@ -27,12 +27,12 @@ import '../../features/listings/presentation/screens/listing_comparison_screen.d
 import 'main_shell.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
-  final auth = ref.watch(authControllerProvider);
-
-  return GoRouter(
+  // Keep navigation and form state when auth reports an error or profile update.
+  // The refresh stream reevaluates redirects using the current auth state.
+  final refresh = GoRouterRefreshStream(ref.watch(_routerRefreshProvider).stream);
+  final router = GoRouter(
     initialLocation: '/splash',
-    refreshListenable:
-        GoRouterRefreshStream(ref.watch(_routerRefreshProvider).stream),
+    refreshListenable: refresh,
     routes: [
       GoRoute(
           path: '/splash', builder: (context, state) => const SplashScreen()),
@@ -148,6 +148,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       ),
     ],
     redirect: (context, state) {
+      final auth = ref.read(authControllerProvider);
       final loc = state.matchedLocation;
 
       if (auth.stage == AuthStage.bootstrapping) {
@@ -173,7 +174,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
       if (auth.stage == AuthStage.banned) {
         // MVP: banned user is logged out to reduce surface area.
-        return '/';
+        return loc == '/' ? null : '/';
       }
 
       // Authenticated (verified or not)
@@ -195,6 +196,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       return isApp ? null : '/app/home';
     },
   );
+  ref.onDispose(() {
+    router.dispose();
+    refresh.dispose();
+  });
+  return router;
 });
 
 String _homeFor(AuthStage stage) {

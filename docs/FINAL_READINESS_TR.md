@@ -1,5 +1,7 @@
 # Son hazırlık raporu — 15 Eylül 2026
 
+Bu rapordan sonraki iOS derlemeleri, native E2E, router/readiness düzeltmeleri ve güncel yayın engelleri: [Yatırımcı demosu ve TestFlight](TESTFLIGHT_TR.md).
+
 Kod ve yerel üretim doğrulaması tamamlandı. **Genel internete canlı yayın yapılmadı:** hedef sunucu, DNS/alan adı ve SMTP hesabı erişimleri sağlanmadı. Ücretli AI/SMS/KYC/otomatik ölçekleme hizmeti açılmadı. Sunucu, elektrik, bağlantı, alan adı veya mevcut sağlayıcı kotaları için mutlak sıfır maliyet garantisi verilemez.
 
 Önceki arayüz ve sistem denetiminin ayrıntıları [14 Eylül raporunda](PRODUCTION_READINESS_TR.md); bu belge o rapordaki açık maddelerin güncel durumudur. Bu rapor commit/push öncesindeki doğrulama sonuçlarını kaydeder.

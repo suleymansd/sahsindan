@@ -22,7 +22,8 @@ def main():
         parser.error("Run flutter pub get in apps/mobile first")
     with tempfile.TemporaryDirectory(prefix="trustmarket-mobile-analysis-", dir="/tmp") as directory:
         target = Path(directory)
-        for name in ("lib", "test"):
+        sources = [name for name in ("lib", "test", "integration_test") if (source / name).is_dir()]
+        for name in sources:
             shutil.copytree(source / name, target / name)
         for name in ("pubspec.yaml", "pubspec.lock", "analysis_options.yaml"):
             shutil.copy2(source / name, target / name)
@@ -31,7 +32,7 @@ def main():
             package["rootUri"] = target.as_uri() + "/" if package["name"] == "trustmarket_mobile" else urljoin(package_config.parent.as_uri() + "/", package["rootUri"])
         (target / ".dart_tool").mkdir()
         (target / ".dart_tool/package_config.json").write_text(json.dumps(config))
-        return subprocess.run([args.flutter, "analyze", "--no-pub", "lib", "test"], cwd=target).returncode
+        return subprocess.run([args.flutter, "analyze", "--no-pub", *sources], cwd=target).returncode
 
 
 if __name__ == "__main__":

@@ -1,0 +1,51 @@
+{
+  "date": "2026-09-15",
+  "status": "local_demo_verified_live_deployment_pending",
+  "production_deployed": false,
+  "testflight_uploaded": false,
+  "distribution_ipa_created": false,
+  "ios_bundle_id": "com.sahsindan.app",
+  "apple_team_id": "475GX393HD",
+  "tests": {
+    "api_postgresql_real_redis": {
+      "passed": 138,
+      "failed": 0,
+      "skipped": 0
+    },
+    "web_unit": {
+      "passed": 5
+    },
+    "web_chromium_e2e": {
+      "passed": 12
+    },
+    "flutter_unit_widget": {
+      "passed": 18
+    },
+    "ios_native_e2e": {
+      "passed": 1,
+      "scenarios": [
+        "required_fields",
+        "invalid_password",
+        "login",
+        "listing_detail"
+      ]
+    },
+    "ios_release_script": {
+      "passed": 8
+    }
+  },
+  "validation": {
+    "flutter_analysis": "clean (lib/test/integration_test via ASCII mirror)",
+    "python_ruff_F_E9": "passed",
+    "ios_simulator_build": "passed",
+    "ios_release_device_build": "passed, unsigned compile-only, API URL not configured",
+    "web_production_build": "passed during E2E"
+  },
+  "blockers": [
+    "Live hostname and hosting/SSH access not supplied",
+    "SMTP/operator and remote backup targets not supplied",
+    "Apple distribution access and App Store Connect app record not verified",
+    "Real device and external TestFlight review not completed"
+  ],
+  "capacity_note": "Previous local 100-session load result is not a public-host capacity guarantee"
+}
