@@ -1,0 +1,48 @@
+{
+  "date": "2026-09-15",
+  "status": "railway_project_created_plan_verified_not_deployed",
+  "project_id": "87da6148-dba9-4e45-b6cf-f42e7819b820",
+  "project_name": "sahsindan",
+  "cloud_services": 0,
+  "cloud_volumes": 0,
+  "plan_applied": false,
+  "production_deployed": false,
+  "testflight_uploaded": false,
+  "investor_ready_ipa": false,
+  "signing_only_ipa_export_verified": true,
+  "plan": {
+    "add_services": 4,
+    "add_volumes": 3,
+    "modify": 0,
+    "delete": 0
+  },
+  "tests": {
+    "backend_postgresql_real_redis": {
+      "passed": 145,
+      "failed": 0,
+      "skipped": 0
+    },
+    "new_railway_regressions": 7,
+    "web_unit_passed": 5,
+    "docker_smoke_passed": [
+      "small_resource_backend_startup",
+      "nonroot_and_unauthorized_endpoints",
+      "uploads_survive_restart",
+      "maintenance_failure_stops_api",
+      "small_resource_web_http_200",
+      "public_api_build_argument_in_bundle"
+    ]
+  },
+  "builds": {
+    "api_docker": "passed",
+    "web_docker": "passed"
+  },
+  "railway_sdk_audit_vulnerabilities": 0,
+  "limits_note": "Resource and application quotas are not a monthly billing cap. Existing workspace budget limits were not changed.",
+  "pending": [
+    "Authorization for billed runtime resources under the prior zero-budget constraint",
+    "Provision secrets, HTTPS domains and live services",
+    "Operator MFA, investor accounts, SMTP and offsite backups",
+    "Live E2E and IPA rebuild against live API, then TestFlight upload/review"
+  ]
+}

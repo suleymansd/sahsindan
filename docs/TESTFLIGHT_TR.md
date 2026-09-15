@@ -2,6 +2,11 @@
 
 **Yerel demo çalışıyor; internete backend yayını ve TestFlight yüklemesi yapılmadı. Dağıtılabilir IPA henüz yok.** Bu belge önceki [hazırlık raporuna](FINAL_READINESS_TR.md) ektir.
 
+Son durum: [Railway düşük kullanım profili](RAILWAY_TR.md) hazır, proje boş olarak
+açıldı ve 145 backend testi geçti; ücretli servisler başlatılmadı. Xcode arşiv ve
+App Store Connect IPA export denemesi başarılı oldu. Bu imzalama denemesi canlı
+API'ye bağlı olmadığı için yatırımcıya verilecek IPA değildir; TestFlight'a yüklenmedi.
+
 ## Yapılanlar
 
 - Bu Mac'te `com.sahsindan.app` / `475GX393HD` ekibine ait, 18 Aralık 2026'ya kadar geçerli App Store provisioning profili bulundu. Projedeki örnek bundle ID düzeltildi. Profil, aktif üyeliğin veya App Store Connect yetkisinin doğrulandığı anlamına gelmez.
@@ -48,7 +53,12 @@ python3 scripts/ios_release.py build --api-url https://GERCEK_ALAN_ADI/api \
 
 Başarılı export `apps/mobile/build/ios/ipa/*.ipa` ve `release.json` üretir; otomatik yükleme yapmaz. Build numarası App Store Connect'te daha önce kullanılmamış olmalıdır; script uzak geçmişi sorgulamaz.
 
-Keychain'de iki **Apple Development** kimliği bulundu; **Apple Distribution** kimliği bulunmadı. Xcode Settings → Accounts altında doğru hesabın `475GX393HD` ekibindeki üyelik/dağıtım erişimi doğrulanmalı ve dağıtım imzası tamamlanmalı. Başka ekiplerin sertifikaları/profilleri değiştirilmedi. Özel anahtar/parolalar sohbete veya repo'ya konulmamalıdır.
+İlk keychain taramasında yalnızca **Apple Development** kimlikleri görünüyordu;
+sonraki gerçek `xcodebuild archive` ve `xcodebuild -exportArchive` denemeleri
+`475GX393HD` ekibiyle başarıyla tamamlandı. Yalnızca sertifika listesinden IPA
+export yapılamayacağı sonucu çıkarılmamalıdır. Canlı backend adresiyle yeni build
+ve App Store Connect uygulama kaydı/yükleme rolü kontrolü hâlâ gereklidir. Başka
+ekiplerin sertifikaları/profilleri değiştirilmedi; özel anahtarlar repo'ya konmadı.
 
 App Store Connect'teki `com.sahsindan.app` kaydı ve rol doğrulandıktan sonra IPA, Transporter veya Xcode Organizer ile yüklenir. İşleme sonrasında beta açıklaması, iletişim, gerekiyorsa inceleme hesabı ve şifreleme soruları tamamlanır. Yatırımcı ekip üyesi değilse dış test grubu ve ilk build için TestFlight App Review gerekir. Apple onayı ve dağıtım tamamlanmadan TestFlight bağlantısı hazır denemez.
 
