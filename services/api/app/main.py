@@ -8,12 +8,14 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.staticfiles import StaticFiles
-from sqlalchemy.exc import OperationalError, TimeoutError as SQLAlchemyTimeoutError
+from sqlalchemy.exc import OperationalError, SQLAlchemyError, TimeoutError as SQLAlchemyTimeoutError
+from redis.exceptions import RedisError
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.api.router import api_router
 from app.core.config import settings
+from app.core.redis import redis_client
 from app.core.rate_limit import RateLimitException, rate_limit_exception_handler
 from app.core.response import error
 from app.core.resource_limits import ResourceLimitsMiddleware
@@ -134,6 +136,11 @@ def ready():
     db: Session = SessionLocal()
     try:
         db.execute(text("SELECT 1"))
+        if not redis_client.ping():
+            raise RedisError("Redis did not acknowledge readiness")
+    except (SQLAlchemyError, RedisError):
+        # Health stays live; readiness must fail when auth/quotas cannot operate.
+        return error("SERVICE_UNAVAILABLE", "Service temporarily unavailable", {}, status_code=503)
     finally:
         db.close()
     return {"status": "ready"}

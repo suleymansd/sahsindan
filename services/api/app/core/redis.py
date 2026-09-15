@@ -14,6 +14,9 @@ class _MemoryRedis:
         self._store: dict[str, str] = {}
         self._exp: dict[str, float] = {}
 
+    def ping(self) -> bool:
+        return True
+
     def _purge_if_expired(self, key: str) -> None:
         exp = self._exp.get(key)
         if exp is None:
