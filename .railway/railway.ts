@@ -73,17 +73,6 @@ export default defineRailway((ctx) => {
     },
     volumeMounts: { "/app/storage": uploads },
   });
-  const web = service("web", {
-    build: { builder: "DOCKERFILE", dockerfilePath: "Dockerfile" },
-    start: "node server.js",
-    healthcheck: "/giris/kullanici",
-    healthcheckTimeout: 120,
-    deploy: { ...small(256, 0.5), sleepApplication: true },
-    env: {
-      PORT: "3000", HOSTNAME: "0.0.0.0", NODE_ENV: "production",
-      NEXT_TELEMETRY_DISABLED: "1",
-      NEXT_PUBLIC_API_URL: "${{shared.PUBLIC_API_URL}}/api",
-    },
-  });
-  return project("sahsindan", { resources: [db, cache, api, web, databaseDisk, redisDisk, uploads] });
+  // The web frontend is deployed separately on Vercel.
+  return project("sahsindan", { resources: [db, cache, api, databaseDisk, redisDisk, uploads] });
 });

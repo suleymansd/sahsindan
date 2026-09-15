@@ -8,6 +8,9 @@ sınırsız açma izni olarak kabul edilmedi.
 
 ## Hazırlanan yapı
 
+Web yayını Vercel'e ayrıldı. Railway planından web servisi çıkarıldı; aynı web
+uygulaması için ikinci bir ücretli çalışma süreci açılmayacak.
+
 Tek ortam ve her serviste tek replika; otomatik ölçeklendirme yok. Yeni Railway
 projeleri için güncel `.railway/railway.ts` kullanılır. SDK `3.11.0` ve bağımlılık
 kilidi kaydedildi. Plan mevcut başka projeleri değiştirmez.
@@ -17,7 +20,6 @@ kilidi kaydedildi. Plan mevcut başka projeleri değiştirmez.
 | API + bakım işlemi | 512 MiB | 0,5 | 1.024 MB |
 | PostgreSQL 16 | 256 MiB | 0,5 | 1.024 MB |
 | Redis 7.4.11 | 128 MiB | 0,25 | 512 MB |
-| Web | 256 MiB | 0,5 | Yok |
 
 Bu değerler tahsis edilen veya sürekli tüketilen miktarlar değil, kaynak
 sınırlarıdır. Yeni imaj dağıtımının kaynak tüketimi ayrıca ölçülmelidir. Profil
@@ -34,7 +36,7 @@ verir. PostgreSQL/Redis erişimi `/ready` üzerinden kontrol edilir.
 PostgreSQL 30 bağlantıyla, API süreç başına 2 bağlantı + 1 ek bağlantıyla
 sınırlandı. Redis 32 MB veride `noeviction` ve kalıcı AOF kullanır; dolduğunda
 yetkilendirme/kota kayıtlarını sessizce silmez. API ve bakım sürekli gerektiği
-için uyutulmaz; web boşta uyuyabilir. Veritabanlarına public TCP proxy açılmaz.
+için uyutulmaz. Veritabanlarına public TCP proxy açılmaz.
 
 Uygulama profili: günlük 10.000 API isteği, ölçülen API yanıtlarında günlük
 50 MiB, toplam 512 MiB yükleme alanı, günlük toplam 50 MiB / kullanıcı başına
@@ -59,10 +61,10 @@ Bu limitler tüm sağlayıcı trafiğini, derlemeleri veya aylık faturayı sın
    `railway up services/api --path-as-root --service api --environment production`.
    `alembic upgrade head` pre-deploy adımında çalışır. Pre-deploy diski göremediği
    için dosya uzlaştırması bu adımda çalıştırılmaz; bakım başlangıçta yapar.
-4. Web yüklenir:
-   `railway up apps/web --path-as-root --service web --environment production`.
-   `NEXT_PUBLIC_API_URL` Docker build arg olarak derleme sırasında kullanılır.
-   Adres değişirse web yeniden derlenir. Varsayılan Docker `/api` davranışı korunur.
+4. Web Vercel üzerinden yayımlanır. Backend bağlanırken gerçek domain üzerinde
+   CORS, HttpOnly refresh çerezi ve oturum yenileme doğrulanır; yalnızca API
+   adresini yazmak tam entegrasyon kanıtı değildir. API bağlantısı olmadan web
+   tanıtım durumunu gösterir ve hesap işlemlerini başlatmaz.
 5. Gerçek yönetici ve MFA kurulumu, kontrollü yatırımcı hesapları ve gerçek HTTPS
    üzerinde giriş/ilan/fotoğraf/mesajlaşma akışları doğrulanır. Yerel test
    kullanıcıları veya bilinen demo şifreleri internete taşınmaz.
@@ -77,7 +79,7 @@ gerçek kullanıcı verisi kabul etmeden önce tamamlanmalıdır.
 
 ## Doğrulama
 
-- Railway planı: 4 servis + 3 disk ekleme niyeti; sıfır değiştirme/silme,
+- Güncel Railway planı: 3 servis + 3 disk ekleme niyeti; sıfır değiştirme/silme,
   tanı hatası yok. **Apply çalıştırılmadı.**
 - Gerçek geçici PostgreSQL + Redis üzerinde tüm backend süiti: **145 geçti**.
   Bunun 7 testi Railway başlangıcı, disk denetimi, yetki düşürme, süreç hatası

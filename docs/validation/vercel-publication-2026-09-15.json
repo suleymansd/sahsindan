@@ -1,0 +1,45 @@
+{
+  "date": "2026-09-15",
+  "public_url": "https://sahsindan.vercel.app",
+  "project_id": "prj_zH9r1GeLiTJuTHebSRZJsxSQeSVM",
+  "team_slug": "suleymans-projects-ec4664c7",
+  "plan": "hobby",
+  "paid_upgrade": false,
+  "deployment_id": "dpl_CbqQrvmwrMB4mg7CNp8MeLYW6bFj",
+  "deployment_state": "READY",
+  "application_commit": "2301475",
+  "web_published": true,
+  "backend_published": false,
+  "transactions_enabled": false,
+  "testflight_uploaded": false,
+  "tests": {
+    "web_unit_passed": 8,
+    "existing_backend_e2e_passed": 12,
+    "local_publication_e2e_passed": 2,
+    "live_publication_e2e_passed": 2,
+    "public_https_paths_200": [
+      "/",
+      "/giris/kullanici",
+      "/uye-ol",
+      "/yardim"
+    ]
+  },
+  "source_upload": {
+    "scope": "apps/web",
+    "files": 108,
+    "environment_files_excluded": true
+  },
+  "railway_plan": {
+    "services": 3,
+    "volumes": 3,
+    "web_service_removed": true,
+    "applied": false
+  },
+  "commercial_plan_compliance": "Unresolved: Hobby is limited to personal non-commercial use; no paid upgrade authorized or performed",
+  "remaining": [
+    "Live backend",
+    "Cross-site cookies/CORS and WebSocket validation",
+    "SMTP, operator MFA and backups",
+    "Live API IPA rebuild and TestFlight upload"
+  ]
+}

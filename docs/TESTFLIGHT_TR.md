@@ -2,6 +2,10 @@
 
 **Yerel demo çalışıyor; internete backend yayını ve TestFlight yüklemesi yapılmadı. Dağıtılabilir IPA henüz yok.** Bu belge önceki [hazırlık raporuna](FINAL_READINESS_TR.md) ektir.
 
+**Web tanıtım yayını artık açık:** https://sahsindan.vercel.app.
+[Vercel raporu](VERCEL_TR.md) canlı masaüstü/mobil kontrollerini içerir. Backend
+olmadığı için üyelik, giriş ve ilan işlemleri kapalıdır.
+
 Son durum: [Railway düşük kullanım profili](RAILWAY_TR.md) hazır, proje boş olarak
 açıldı ve 145 backend testi geçti; ücretli servisler başlatılmadı. Xcode arşiv ve
 App Store Connect IPA export denemesi başarılı oldu. Bu imzalama denemesi canlı
