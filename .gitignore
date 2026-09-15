@@ -23,6 +23,7 @@ out/
 coverage/
 test-results/
 playwright-report/
+.vercel/
 
 # Flutter / Dart
 .dart_tool/

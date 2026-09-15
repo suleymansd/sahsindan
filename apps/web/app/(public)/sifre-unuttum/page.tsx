@@ -6,7 +6,7 @@ import { CheckCircle2, KeyRound, Loader2 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { apiFetch } from "@/lib/api";
+import { apiFetch, API_CONFIGURED } from "@/lib/api";
 import { toFriendlyError } from "@/lib/errors";
 
 export default function ForgotPage() {
@@ -56,7 +56,7 @@ export default function ForgotPage() {
               required
             />
           </div>
-          <Button type="submit" size="lg" className="w-full" disabled={loading}>
+          <Button type="submit" size="lg" className="w-full" disabled={loading || !API_CONFIGURED}>
             {loading ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />

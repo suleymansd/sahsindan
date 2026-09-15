@@ -1,0 +1,14 @@
+node_modules
+pnpm-lock.yaml
+.next
+.next-e2e
+.vercel
+.env*
+coverage
+test-results
+playwright-report
+tests
+*.tsbuildinfo
+playwright*.config.ts
+Dockerfile
+.dockerignore

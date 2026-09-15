@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { useAuth, type UserSummary } from "@/lib/auth";
 import { toFriendlyError } from "@/lib/errors";
 import { safeRedirect } from "@/lib/redirect";
+import { API_CONFIGURED } from "@/lib/api";
 
 type RoleLoginPanelProps = {
   badge: string;
@@ -160,7 +161,7 @@ export function RoleLoginPanel({
           </div>
         )}
 
-        <Button type="submit" size="lg" className="w-full" disabled={loading}>
+        <Button type="submit" size="lg" className="w-full" disabled={loading || !API_CONFIGURED}>
           {loading ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />

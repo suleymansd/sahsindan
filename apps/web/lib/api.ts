@@ -1,4 +1,6 @@
-const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL || "http://127.0.0.1:8080/api";
+const configuredApiUrl = (process.env.NEXT_PUBLIC_API_URL ||
+  (process.env.NODE_ENV === "production" ? "" : "http://127.0.0.1:8080/api")).trim().replace(/\/+$/, "");
+export const API_CONFIGURED = configuredApiUrl.length > 0;
 export const API_URL = configuredApiUrl.startsWith("/") && typeof window !== "undefined"
   ? `${window.location.origin}${configuredApiUrl}` : configuredApiUrl;
 
@@ -15,6 +17,9 @@ export function refreshSession() {
 }
 
 export async function apiFetch(path: string, options: ApiOptions = {}) {
+  if (!API_CONFIGURED) {
+    throw new Error("Tanıtım yayını: Üyelik, giriş ve ilan işlemleri henüz açık değil.");
+  }
   const { skipAuthRedirect, ...init } = options;
   try {
     const headers = new Headers(init.headers);

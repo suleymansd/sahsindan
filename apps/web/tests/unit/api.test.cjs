@@ -4,12 +4,12 @@ const fs = require('node:fs');
 const vm = require('node:vm');
 const ts = require('typescript');
 
-function loadApi(fetch) {
+function loadApi(fetch, env = { NEXT_PUBLIC_API_URL: '/api' }) {
   const exports = {};
   const events = [];
   const context = {
     exports, fetch, Headers, FormData, AbortSignal, CustomEvent, Error, TypeError,
-    process: { env: { NEXT_PUBLIC_API_URL: '/api' } },
+    process: { env },
     window: { location: { origin: 'https://market.example', pathname: '/ilanlar', search: '', href: '' }, dispatchEvent: (event) => events.push(event.type) },
   };
   const code = ts.transpileModule(fs.readFileSync('lib/api.ts', 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText;
@@ -20,6 +20,26 @@ const response = (status, data) => new Response(JSON.stringify(data), {status, h
 
 test('same-origin configuration resolves HTTPS API', () => {
   assert.equal(loadApi(() => {}).API_URL, 'https://market.example/api');
+});
+
+test('production without a backend never sends credentials or refresh requests', async () => {
+  let calls = 0;
+  const api = loadApi(() => { calls++; }, { NODE_ENV: 'production' });
+  assert.equal(api.API_CONFIGURED, false);
+  assert.equal(api.API_URL, '');
+  await assert.rejects(() => api.apiFetch('/auth/login', {method: 'POST', body: 'private'}), /henüz açık değil/);
+  await assert.rejects(() => api.refreshSession(), /henüz açık değil/);
+  assert.equal(calls, 0);
+});
+
+test('explicit backend enables production and normalizes trailing slash', () => {
+  const api = loadApi(() => {}, {NODE_ENV: 'production', NEXT_PUBLIC_API_URL: 'https://api.market.example/api/'});
+  assert.equal(api.API_CONFIGURED, true);
+  assert.equal(api.API_URL, 'https://api.market.example/api');
+});
+
+test('development keeps local backend fallback', () => {
+  assert.equal(loadApi(() => {}, {NODE_ENV: 'development'}).API_URL, 'http://127.0.0.1:8080/api');
 });
 
 test('concurrent refresh callers share one network request', async () => {

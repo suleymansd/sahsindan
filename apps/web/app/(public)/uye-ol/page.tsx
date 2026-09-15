@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/lib/auth";
 import { toFriendlyError } from "@/lib/errors";
+import { API_CONFIGURED } from "@/lib/api";
 
 const POST_STEPS = [
   "Hesap açılır ve panel aktif olur",
@@ -169,7 +170,7 @@ export default function RegisterPage() {
             )}
 
             <div className="sm:col-span-2 space-y-3">
-              <Button type="submit" size="lg" className="w-full" disabled={loading}>
+              <Button type="submit" size="lg" className="w-full" disabled={loading || !API_CONFIGURED}>
                 {loading ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin" />
